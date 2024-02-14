@@ -1,0 +1,37 @@
+// swift-tools-version:5.9
+
+import PackageDescription
+
+let package = Package(
+    name: "mvt-postgis",
+    platforms: [
+        .macOS(.v13),
+        .iOS(.v16),
+        .tvOS(.v16),
+    ],
+    products: [
+        .library(name: "MVTPostgis", targets: ["MVTPostgis"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "1.3.2"),
+        .package(url: "https://github.com/Outdooractive/gis-tools", from: "1.2.0"),
+        .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "0.7.0"),
+        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.20.2"),
+        .package(url: "https://github.com/apple/swift-collections", from: "1.1.0"),
+        .package(url: "https://github.com/yahoojapan/SwiftyXMLParser", from: "5.6.0"),
+        .package(url: "https://github.com/jpsim/Yams", from: "4.0.6"),
+    ],
+    targets: [
+        .target(
+            name: "MVTPostgis",
+            dependencies: [
+                .product(name: "GISTools", package: "gis-tools"),
+                .product(name: "MVTTools", package: "mvt-tools"),
+                .product(name: "PostgresConnectionPool", package: "PostgresConnectionPool"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "Collections", package: "swift-collections"),
+                .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
+                .product(name: "Yams", package: "Yams"),
+            ]),
+    ]
+)
