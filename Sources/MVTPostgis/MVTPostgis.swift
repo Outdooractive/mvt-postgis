@@ -130,20 +130,20 @@ public final class MVTPostgis {
     /// Return tile data at the given z/x/y coordinate.
     ///
     /// - Note: Only `bufferSize` from `options` will be used here.
-    public func dataFor(
-        tile: MapTile,
+    public func data(
+        forTile tile: MapTile,
         options: VectorTileExportOptions)
         async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?)
     {
-        let tileAndPerformanceData = try await mvtFor(tile: tile, options: options)
+        let tileAndPerformanceData = try await mvt(forTile: tile, options: options)
         return (tileAndPerformanceData.tile.data(options: options), tileAndPerformanceData.performance)
     }
 
     /// Create a tile at the given z/x/y coordinate.
     ///
     /// - Note: Only `bufferSize` from `options` will be used here.
-    public func mvtFor(
-        tile: MapTile,
+    public func mvt(
+        forTile tile: MapTile,
         options: VectorTileExportOptions? = nil)
         async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?)
     {
@@ -187,7 +187,7 @@ public final class MVTPostgis {
                         .replacingOccurrences(of: "!scale_denominator!", with: String(scaleDenominator))
                         .replacingOccurrences(of: "!pixel_width!", with: String(pixelWidth))
 
-                    let geometryField = layer.datasource.geometryField.nilIfEmpty ?? "geometry"
+                    let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
                     let simplificationOption = MVTPostgis.configuration.simplification(tile.z, self.source)
                     let clippingOption = MVTPostgis.configuration.clipping(tile.z, self.source)
                     var columns = layer.fields.keys.map({ "\"\($0)\"" })
@@ -362,7 +362,7 @@ public final class MVTPostgis {
         var wkbBytes: Int64 = 0
         var invalidFeatures: Int = 0
 
-        let geometryColumn = layer.datasource.geometryField.nilIfEmpty ?? "geometry"
+        let geometryColumn = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
         try await poolDistributor.connection(
             forLayer: layer,
             batchId: batchId,
@@ -381,7 +381,7 @@ public final class MVTPostgis {
 
                     guard row.contains(geometryColumn) else {
                         // TODO: Throw error or find a suitable column
-                        logger.warning("\(externalName ?? source.name): Couldn't find geometry column in layer \(layer.id)")
+                        logger.warning("\(externalName ?? source.name): Couldn't find the geometry column '\(geometryColumn)' in layer \(layer.id)")
                         break
                     }
                     guard let geometryBytes = row[data: geometryColumn].value else { continue }
@@ -390,7 +390,7 @@ public final class MVTPostgis {
 
                     var properties: [String: Any] = [:]
                     for field in row {
-                        guard field.columnName != layer.datasource.geometryField else { continue }
+                        guard field.columnName != geometryColumn else { continue }
 
                         switch field.dataType {
                         case .bpchar, .varchar, .text:

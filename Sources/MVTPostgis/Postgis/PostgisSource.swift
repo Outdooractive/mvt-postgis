@@ -24,6 +24,8 @@ public struct PostgisSource: Codable {
     /// The source's layers with the Postgis configuration and SQL.
     public let layers: [PostgisLayer]
 
+    // MARK: -
+
     /// Load a source from an URL, can either be JSON, or Mapnik YML or XML.
     public static func load(
         from url: URL,

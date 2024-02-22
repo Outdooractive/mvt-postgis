@@ -15,8 +15,8 @@ public struct PostgisDatasource: Codable {
 
     /// The database name.
     public let databaseName: String
-    /// The name of the geometry field to use.
-    public let geometryField: String
+    /// The name of the geometry field to use. Default is 'geometry'.
+    public let geometryField: String?
 
     /// The extent of the datasource.
     public let boundingBox: BoundingBox?

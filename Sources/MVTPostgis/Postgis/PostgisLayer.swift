@@ -6,10 +6,8 @@ public struct PostgisLayer: Codable {
 
     /// Some layer properties.
     public struct Properties: Codable {
-
         /// The buffer around a tile in pixels.
         public let bufferSize: Int
-
     }
 
     // MARK: -
