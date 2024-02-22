@@ -2,8 +2,6 @@ import Foundation
 import GISTools
 import Yams
 
-// MARK: MapnikYMLSource
-
 /// Loads the Postgis configuration from a Mapnik YML source file.
 struct MapnikYMLSource: Decodable {
 
@@ -27,7 +25,7 @@ struct MapnikYMLSource: Decodable {
                 guard layerAllowlist.isNotEmpty else { return true }
                 return layerAllowlist.contains(layer.id)
             })
-            .map(\.asMapnikLayer)
+            .map(\.asPostgisLayer)
 
         return PostgisSource(
             name: ymlSource.name,
@@ -51,10 +49,12 @@ struct MapnikYMLSource: Decodable {
         guard _center.count >= 2 else { return Coordinate3D(latitude: 0.0, longitude: 0.0) }
         return Coordinate3D(latitude: _center[1], longitude: _center[0])
     }
+
     private var defaultZoom: Int {
         guard _center.count >= 3 else { return 14 }
         return Int(_center[2])
     }
+
     private let minZoom: Int
     private let maxZoom: Int
 
@@ -84,17 +84,26 @@ private struct MapnikYMLLayer: Decodable {
 
     private let properties: MapnikYMLProperties
     var bufferSize: Int {
-        return properties.bufferSize
+        properties.bufferSize
     }
 
-    var asMapnikLayer: PostgisLayer {
-        PostgisLayer(
+    var asPostgisLayer: PostgisLayer {
+        // Supported:
+        // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
+        // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
+        let projection: Projection = switch srs.lowercased() {
+        case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs": .epsg4326
+        case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
+        default: .noSRID
+        }
+
+        return PostgisLayer(
             id: id,
             description: description,
-            srs: srs,
+            projection: projection,
             fields: fields,
-            datasource: datasource.asMapnikDatasource,
-            bufferSize: bufferSize)
+            properties: .init(bufferSize: bufferSize),
+            datasource: datasource.asPostgisDatasource)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -134,8 +143,21 @@ private struct MapnikYMLDatasource: Decodable {
     let maxSize: Int
     let sql: String
 
-    var asMapnikDatasource: PostgisDatasource {
-        PostgisDatasource(
+    var asPostgisDatasource: PostgisDatasource {
+        var projection: Projection = .noSRID
+        if let srid = Int(srid) {
+            projection = Projection(srid: srid) ?? .noSRID
+        }
+
+        var boundingBox: BoundingBox = .world.projected(to: projection)
+        let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
+        if components.count == 4 {
+            boundingBox = BoundingBox(
+                southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
+                northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
+        }
+
+        return PostgisDatasource(
             user: user,
             password: password,
             host: host,
@@ -145,8 +167,8 @@ private struct MapnikYMLDatasource: Decodable {
             geometryTable: geometryTable,
             keyField: keyField,
             keyFieldAsAttribute: keyFieldAsAttribute,
-            extent: extent,
-            srid: srid,
+            boundingBox: boundingBox,
+            projection: projection,
             type: type,
             maxSize: maxSize,
             sql: sql)

@@ -9,7 +9,7 @@ public struct MVTLayerPerformanceData {
     public let wkbBytes: Int64
     /// The number of features in a layer.
     public let features: Int
-    /// The number of invslid features in a layer.
+    /// The number of invalid features in a layer.
     public let invalidFeatures: Int
 
     public init(

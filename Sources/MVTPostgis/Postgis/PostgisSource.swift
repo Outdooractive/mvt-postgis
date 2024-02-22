@@ -2,7 +2,7 @@ import Foundation
 import GISTools
 
 /// A Postgis source as parsed from a Mapnik YML or XML file.
-public struct PostgisSource {
+public struct PostgisSource: Codable {
 
     public let name: String
     public let description: String

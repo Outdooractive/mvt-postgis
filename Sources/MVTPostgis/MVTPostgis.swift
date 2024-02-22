@@ -91,28 +91,10 @@ public final class MVTPostgis {
         let layer = source.layers[0]
         let datasource = layer.datasource
 
-        let srs = layer.srs
-        if !srs.isEmpty {
-            // Supported:
-            // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
-            // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
-
-            switch srs.lowercased() {
-            case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs":
-                projection = .epsg4326
-            case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over":
-                projection = .epsg3857
-            default:
-                throw MVTPostgisError.unsupportedSRS
-            }
-        }
-        else {
-            guard let srid = Int(datasource.srid),
-                  let projection = Projection(srid: srid),
-                  projection != .noSRID
-            else { throw MVTPostgisError.unsupportedSRID }
-            self.projection = projection
-        }
+        projection = if layer.projection != .noSRID { layer.projection }
+        else if datasource.projection != .noSRID { datasource.projection }
+        else { .noSRID }
+        guard projection != .noSRID else { throw MVTPostgisError.unsupportedSRID }
 
         self.source = source
         self.externalName = externalName
@@ -199,7 +181,7 @@ public final class MVTPostgis {
                     let bounds = try queryBounds(
                         tile: tile,
                         tileSize: options?.tileSize ?? 256, // pixels
-                        bufferSize: layer.bufferSize) // pixels
+                        bufferSize: layer.properties.bufferSize) // pixels
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
                     let sql = layer.datasource.sql

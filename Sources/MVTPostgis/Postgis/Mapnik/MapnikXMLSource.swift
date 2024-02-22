@@ -133,6 +133,28 @@ struct MapnikXMLSource {
 
             let layerFields = fields[name] ?? [:]
 
+            // Supported:
+            // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
+            // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
+            let projection: Projection = switch srs.lowercased() {
+            case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs": .epsg4326
+            case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
+            default: .noSRID
+            }
+
+            var datasourceProjection: Projection = .noSRID
+            if let srid = Int(srid) {
+                datasourceProjection = Projection(srid: srid) ?? .noSRID
+            }
+
+            var datasourceBoundingBox: BoundingBox = .world.projected(to: projection)
+            let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
+            if components.count == 4 {
+                datasourceBoundingBox = BoundingBox(
+                    southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
+                    northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
+            }
+
             let datasource = PostgisDatasource(
                 user: user,
                 password: password,
@@ -143,18 +165,18 @@ struct MapnikXMLSource {
                 geometryTable: geometryTable,
                 keyField: keyField,
                 keyFieldAsAttribute: keyFieldAsAttribute,
-                extent: extent,
-                srid: srid,
+                boundingBox: datasourceBoundingBox,
+                projection: datasourceProjection,
                 type: type,
                 maxSize: maxSize,
                 sql: sql)
             let layer = PostgisLayer(
                 id: name,
                 description: "",
-                srs: srs,
+                projection: projection,
                 fields: layerFields,
-                datasource: datasource,
-                bufferSize: bufferSize)
+                properties: .init(bufferSize: bufferSize),
+                datasource: datasource)
             layers.append(layer)
         })
 
