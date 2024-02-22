@@ -100,10 +100,9 @@ private struct MapnikYMLLayer: Decodable {
         return PostgisLayer(
             id: id,
             description: description,
-            projection: projection,
             fields: fields,
             properties: .init(bufferSize: bufferSize),
-            datasource: datasource.asPostgisDatasource)
+            datasource: datasource.asPostgisDatasource(layerProjection: projection))
     }
 
     enum CodingKeys: String, CodingKey {
@@ -133,28 +132,26 @@ private struct MapnikYMLDatasource: Decodable {
 
     let databaseName: String
     let geometryField: String
-    let geometryTable: String
-    let keyField: String
-    let keyFieldAsAttribute: String
 
     let extent: String
     let srid: String
     let type: String
-    let maxSize: Int
     let sql: String
 
-    var asPostgisDatasource: PostgisDatasource {
-        var projection: Projection = .noSRID
-        if let srid = Int(srid) {
-            projection = Projection(srid: srid) ?? .noSRID
+    func asPostgisDatasource(layerProjection: Projection) -> PostgisDatasource {
+        var projection: Projection?
+        if let srid = Int(srid), srid > 0 {
+            projection = Projection(srid: srid)
         }
 
-        var boundingBox: BoundingBox = .world.projected(to: projection)
-        let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
-        if components.count == 4 {
-            boundingBox = BoundingBox(
-                southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
-                northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
+        var boundingBox: BoundingBox?
+        if let projection {
+            let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
+            if components.count == 4 {
+                boundingBox = BoundingBox(
+                    southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
+                    northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
+            }
         }
 
         return PostgisDatasource(
@@ -164,13 +161,9 @@ private struct MapnikYMLDatasource: Decodable {
             port: port,
             databaseName: databaseName,
             geometryField: geometryField,
-            geometryTable: geometryTable,
-            keyField: keyField,
-            keyFieldAsAttribute: keyFieldAsAttribute,
             boundingBox: boundingBox,
-            projection: projection,
+            srid: projection ?? layerProjection,
             type: type,
-            maxSize: maxSize,
             sql: sql)
     }
 
@@ -179,12 +172,8 @@ private struct MapnikYMLDatasource: Decodable {
 
         case databaseName = "dbname"
         case geometryField = "geometry_field"
-        case geometryTable = "geometry_table"
-        case keyField = "key_field"
-        case keyFieldAsAttribute = "key_field_as_attribute"
 
         case extent, srid, type
-        case maxSize = "max_size"
         case sql = "table"
     }
 

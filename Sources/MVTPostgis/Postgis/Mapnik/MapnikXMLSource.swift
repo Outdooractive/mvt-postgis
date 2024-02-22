@@ -54,7 +54,7 @@ struct MapnikXMLSource {
         })
 
         guard name.isNotEmpty, fields.isNotEmpty else {
-            throw MVTPostgisError.xmlError(message: "Missing name parameter")
+            throw MVTPostgisError.xmlError(message: "Missing 'name' or 'json' parameter")
         }
 
         xmlParser.Map.Layer.all?.forEach({ element in
@@ -86,14 +86,10 @@ struct MapnikXMLSource {
 
             var databaseName = ""
             var geometryField = ""
-            var geometryTable = ""
-            var keyField = ""
-            var keyFieldAsAttribute = ""
 
             var extent = ""
             var srid = ""
             var type = ""
-            var maxSize = 0
             var sql = ""
 
             datasourceElement.childElements.forEach({ element in
@@ -108,13 +104,9 @@ struct MapnikXMLSource {
                 case "port": port = value.toInt ?? 5432
                 case "dbname": databaseName = value
                 case "geometry_field": geometryField = value
-                case "geometry_table": geometryTable = value
-                case "key_field": keyField = value
-                case "key_field_as_attribute": keyFieldAsAttribute = value
                 case "extent": extent = value
                 case "srid": srid = value
                 case "type": type = value
-                case "max_size": maxSize = value.toInt ?? 512
                 case "table": sql = value
                 default: return
                 }
@@ -136,23 +128,25 @@ struct MapnikXMLSource {
             // Supported:
             // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
             // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
-            let projection: Projection = switch srs.lowercased() {
+            let layerProjection: Projection = switch srs.lowercased() {
             case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs": .epsg4326
             case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
             default: .noSRID
             }
 
-            var datasourceProjection: Projection = .noSRID
-            if let srid = Int(srid) {
-                datasourceProjection = Projection(srid: srid) ?? .noSRID
+            var datasourceProjection: Projection?
+            if let srid = Int(srid), srid > 0 {
+                datasourceProjection = Projection(srid: srid)
             }
 
-            var datasourceBoundingBox: BoundingBox = .world.projected(to: projection)
-            let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
-            if components.count == 4 {
-                datasourceBoundingBox = BoundingBox(
-                    southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
-                    northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
+            var datasourceBoundingBox: BoundingBox?
+            if let datasourceProjection {
+                let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
+                if components.count == 4 {
+                    datasourceBoundingBox = BoundingBox(
+                        southWest: Coordinate3D(x: components[0], y: components[1], projection: datasourceProjection),
+                        northEast: Coordinate3D(x: components[2], y: components[3], projection: datasourceProjection))
+                }
             }
 
             let datasource = PostgisDatasource(
@@ -162,18 +156,13 @@ struct MapnikXMLSource {
                 port: port,
                 databaseName: databaseName,
                 geometryField: geometryField,
-                geometryTable: geometryTable,
-                keyField: keyField,
-                keyFieldAsAttribute: keyFieldAsAttribute,
                 boundingBox: datasourceBoundingBox,
-                projection: datasourceProjection,
+                srid: datasourceProjection ?? layerProjection,
                 type: type,
-                maxSize: maxSize,
                 sql: sql)
             let layer = PostgisLayer(
                 id: name,
                 description: "",
-                projection: projection,
                 fields: layerFields,
                 properties: .init(bufferSize: bufferSize),
                 datasource: datasource)

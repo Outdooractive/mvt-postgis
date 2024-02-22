@@ -91,9 +91,7 @@ public final class MVTPostgis {
         let layer = source.layers[0]
         let datasource = layer.datasource
 
-        projection = if layer.projection != .noSRID { layer.projection }
-        else if datasource.projection != .noSRID { datasource.projection }
-        else { .noSRID }
+        projection = datasource.srid
         guard projection != .noSRID else { throw MVTPostgisError.unsupportedSRID }
 
         self.source = source
@@ -132,19 +130,19 @@ public final class MVTPostgis {
     /// Return tile data at the given z/x/y coordinate.
     ///
     /// - Note: Only `bufferSize` from `options` will be used here.
-    public func tileData(
+    public func dataFor(
         tile: MapTile,
         options: VectorTileExportOptions)
         async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?)
     {
-        let tileAndPerformanceData = try await mvtForTile(tile: tile, options: options)
+        let tileAndPerformanceData = try await mvtFor(tile: tile, options: options)
         return (tileAndPerformanceData.tile.data(options: options), tileAndPerformanceData.performance)
     }
 
     /// Create a tile at the given z/x/y coordinate.
     ///
     /// - Note: Only `bufferSize` from `options` will be used here.
-    public func mvtForTile(
+    public func mvtFor(
         tile: MapTile,
         options: VectorTileExportOptions? = nil)
         async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?)
