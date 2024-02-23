@@ -92,7 +92,7 @@ private struct MapnikYMLLayer: Decodable {
         // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
         // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
         let projection: Projection = switch srs.lowercased() {
-        case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs": .epsg4326
+        case "+proj=longlat +ellps=wgs84 +datum=wgs84 +no_defs": .epsg4326
         case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
         default: .noSRID
         }
@@ -139,19 +139,17 @@ private struct MapnikYMLDatasource: Decodable {
     let sql: String
 
     func asPostgisDatasource(layerProjection: Projection) -> PostgisDatasource {
-        var projection: Projection?
+        var projection = layerProjection
         if let srid = Int(srid), srid > 0 {
-            projection = Projection(srid: srid)
+            projection = Projection(srid: srid) ?? layerProjection
         }
 
         var boundingBox: BoundingBox?
-        if let projection {
-            let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
-            if components.count == 4 {
-                boundingBox = BoundingBox(
-                    southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
-                    northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
-            }
+        let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
+        if components.count == 4 {
+            boundingBox = BoundingBox(
+                southWest: Coordinate3D(x: components[0], y: components[1], projection: projection),
+                northEast: Coordinate3D(x: components[2], y: components[3], projection: projection))
         }
 
         return PostgisDatasource(
@@ -162,7 +160,7 @@ private struct MapnikYMLDatasource: Decodable {
             databaseName: databaseName,
             geometryField: geometryField,
             boundingBox: boundingBox,
-            srid: projection ?? layerProjection,
+            srid: projection,
             type: type,
             sql: sql)
     }

@@ -33,5 +33,8 @@ let package = Package(
                 .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
                 .product(name: "Yams", package: "Yams"),
             ]),
+        .testTarget(
+            name: "MVTPostgisTests",
+            dependencies: ["MVTPostgis"])
     ]
 )

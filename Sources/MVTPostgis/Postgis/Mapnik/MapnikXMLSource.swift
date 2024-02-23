@@ -24,7 +24,8 @@ struct MapnikXMLSource {
         var name = ""
         var description = ""
         var attribution = ""
-        var fields: [String: [String: String]] = [:]
+        var layerFields: [String: [String: String]] = [:]
+        var layerDescriptions: [String: String] = [:]
         var center = Coordinate3D.zero
         var defaultZoom = 13
         var minZoom = 0
@@ -38,22 +39,30 @@ struct MapnikXMLSource {
             else { return }
 
             switch nameAttribute {
-            case "name": name = value
-            case "description": description = value
-            case "attribution": attribution = value
-            case "minzoom": minZoom = Int(value) ?? 0
-            case "maxzoom": maxZoom = Int(value) ?? 20
-            case "json": fields = MapnikXMLSource.parseFields(from: value)
+            case "name":
+                name = value
+            case "description":
+                description = value
+            case "attribution":
+                attribution = value
+            case "minzoom":
+                minZoom = Int(value) ?? 0
+            case "maxzoom":
+                maxZoom = Int(value) ?? 20
+            case "json":
+                layerFields = MapnikXMLSource.parseFields(from: value)
+                layerDescriptions = MapnikXMLSource.parseDescriptions(from: value)
             case "center":
                 let components = value.split(separator: ",").compactMap({ Double($0) })
                 guard components.count == 3 else { return }
                 center = Coordinate3D(latitude: components[1], longitude: components[0])
                 defaultZoom = Int(components[2])
-            default: return
+            default: 
+                return
             }
         })
 
-        guard name.isNotEmpty, fields.isNotEmpty else {
+        guard name.isNotEmpty, layerFields.isNotEmpty else {
             throw MVTPostgisError.xmlError(message: "Missing 'name' or 'json' parameter")
         }
 
@@ -123,30 +132,28 @@ struct MapnikXMLSource {
                 return
             }
 
-            let layerFields = fields[name] ?? [:]
+            let layerFields = layerFields[name] ?? [:]
 
             // Supported:
             // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
             // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
             let layerProjection: Projection = switch srs.lowercased() {
-            case "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs": .epsg4326
+            case "+proj=longlat +ellps=wgs84 +datum=wgs84 +no_defs": .epsg4326
             case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
             default: .noSRID
             }
 
-            var datasourceProjection: Projection?
+            var datasourceProjection = layerProjection
             if let srid = Int(srid), srid > 0 {
-                datasourceProjection = Projection(srid: srid)
+                datasourceProjection = Projection(srid: srid) ?? layerProjection
             }
 
             var datasourceBoundingBox: BoundingBox?
-            if let datasourceProjection {
-                let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
-                if components.count == 4 {
-                    datasourceBoundingBox = BoundingBox(
-                        southWest: Coordinate3D(x: components[0], y: components[1], projection: datasourceProjection),
-                        northEast: Coordinate3D(x: components[2], y: components[3], projection: datasourceProjection))
-                }
+            let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
+            if components.count == 4 {
+                datasourceBoundingBox = BoundingBox(
+                    southWest: Coordinate3D(x: components[0], y: components[1], projection: datasourceProjection),
+                    northEast: Coordinate3D(x: components[2], y: components[3], projection: datasourceProjection))
             }
 
             let datasource = PostgisDatasource(
@@ -157,12 +164,12 @@ struct MapnikXMLSource {
                 databaseName: databaseName,
                 geometryField: geometryField,
                 boundingBox: datasourceBoundingBox,
-                srid: datasourceProjection ?? layerProjection,
+                srid: datasourceProjection,
                 type: type,
                 sql: sql)
             let layer = PostgisLayer(
                 id: name,
-                description: "",
+                description: layerDescriptions[name],
                 fields: layerFields,
                 properties: .init(bufferSize: bufferSize),
                 datasource: datasource)
@@ -205,6 +212,21 @@ struct MapnikXMLSource {
         }
 
         return fields
+    }
+
+    private static func parseDescriptions(from jsonString: String) -> [String: String] {
+        guard let data = jsonString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let layers = json["vector_layers"] as? [[String: Any]]
+        else { return [:] }
+
+        return layers.reduce(into: [:]) { partialResult, layer in
+            if let description = layer["description"] as? String,
+               let name = layer["id"] as? String
+            {
+                partialResult[name] = description
+            }
+        }
     }
 
 }

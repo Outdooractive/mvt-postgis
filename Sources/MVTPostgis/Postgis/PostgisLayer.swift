@@ -16,7 +16,7 @@ public struct PostgisLayer: Codable {
     public let id: String
     /// The layer's description, mostly interesting for viewers.
     public let description: String?
-    /// The SQL fields from the query. Must be complete.
+    /// The SQL fields from the query with a description. Must be complete.
     public let fields: [String: String]
     /// Some layer properties.
     public let properties: Properties
