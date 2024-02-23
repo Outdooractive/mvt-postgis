@@ -6,8 +6,6 @@ let package = Package(
     name: "mvt-postgis",
     platforms: [
         .macOS(.v13),
-        .iOS(.v16),
-        .tvOS(.v16),
     ],
     products: [
         .library(name: "MVTPostgis", targets: ["MVTPostgis"]),

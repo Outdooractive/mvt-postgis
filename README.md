@@ -5,11 +5,15 @@
 
 Creates vector tiles from Postgis databases.
 
+## Requirements
+
+This package requires Swift 5.9 or higher (at least Xcode 13), and compiles on macOS (\>= macOS 13) as well as Linux.
+
 ## Installation with Swift Package Manager
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "1.0.0"),
+    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "1.0.4"),
 ],
 targets: [
     .target(name: "MyTarget", dependencies: [
@@ -18,11 +22,17 @@ targets: [
 ]
 ```
 
+This project uses to other libraries that handle the hard work, please have a look at them as well:
+- https://github.com/Outdooractive/gis-tools
+- https://github.com/Outdooractive/mvt-tools
+
 ## Features
 
 TODO
 
 ## Usage
+
+Please see also the [API documentation][https://swiftpackageindex.com/Outdooractive/mvt-postgis/main/documentation/gistools].
 
 TODO
 
