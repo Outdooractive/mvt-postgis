@@ -32,7 +32,7 @@ TODO
 
 ## Usage
 
-Please see also the [API documentation][https://swiftpackageindex.com/Outdooractive/mvt-postgis/main/documentation/gistools].
+Please see also the [API documentation](https://swiftpackageindex.com/Outdooractive/mvt-postgis/main/documentation/mvtpostgis).
 
 TODO
 
