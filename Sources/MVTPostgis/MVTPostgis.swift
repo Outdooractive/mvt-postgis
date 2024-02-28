@@ -10,7 +10,7 @@ import PostgresConnectionPool
 // https://github.com/mapnik/mapnik/blob/master/test/unit/datasource/postgis.cpp
 
 /// A tool for creating vector tiles from Postgis datasources.
-/// Accepts YML and XML sources (as used by Mapnik and the old Mapbox Studio).
+/// Accepts YML and XML sources (as used by Mapnik and the old Mapbox Studio), and new JSON sources.
 public final class MVTPostgis {
 
     /// **MUST** be changed before first use. See ``MVTPostgisConfiguration``.
@@ -24,7 +24,7 @@ public final class MVTPostgis {
     /// The maximum zoom of the datasource.
     public let maxZoom: Int
 
-    /// The Mapnik source.
+    /// The source.
     public let source: PostgisSource
     /// The source's projection (either EPSG:3857 or EPSG:4326).
     public let projection: Projection
@@ -33,6 +33,8 @@ public final class MVTPostgis {
     /// instance from other instances. Used e.g. in runtime tracking
     /// and some error messages.
     public let externalName: String?
+
+    // ===
 
     private let logger: Logger
     private let poolDistributor: PoolDistributor
@@ -75,7 +77,7 @@ public final class MVTPostgis {
             logger: logger)
     }
 
-    /// Initialize a MVT creator directly with a parsed source object.
+    /// Initialize a MVT creator directly with a parsed ``PostgisSource`` object.
     public init(
         source: PostgisSource,
         externalName: String? = nil,
@@ -151,6 +153,7 @@ public final class MVTPostgis {
             throw MVTPostgisError.cancelled
         }
 
+        // TODO: Serialize access
         let nextBatchId = MVTPostgis.batchId
         MVTPostgis.batchId += 1
 

@@ -13,7 +13,7 @@ public struct MVTPostgisConfiguration {
     /// Can be disabled by setting to `nil`.
     public let queryTimeout: TimeInterval?
 
-    /// Timeout for one tile, i.e. the time in which one tile must be finished, in seconds.
+    /// Timeout for one tile, i.e. the time in which one tile must be finished, in seconds (default: 60 seconds).
     public let tileTimeout: TimeInterval
 
     /// The pool size, per database. Each database connection is backed by a pool of this size (default: 10).
@@ -28,7 +28,7 @@ public struct MVTPostgisConfiguration {
     /// Controls if and how much features are simplified.
     public let simplification: ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption)
 
-    /// Track SQL runtimes and return them together with the vector tile.
+    /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
 
     public init(
