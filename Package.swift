@@ -11,8 +11,8 @@ let package = Package(
         .library(name: "MVTPostgis", targets: ["MVTPostgis"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "1.4.0"),
-        .package(url: "https://github.com/Outdooractive/gis-tools", from: "1.4.0"),
+        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "1.5.0"),
+        .package(url: "https://github.com/Outdooractive/gis-tools", from: "1.5.0"),
         .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "0.7.2"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.1"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.1.0"),

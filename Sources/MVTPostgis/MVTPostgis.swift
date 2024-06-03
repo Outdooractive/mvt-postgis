@@ -134,7 +134,7 @@ public final class MVTPostgis {
     /// - Note: Only `bufferSize` from `options` will be used here.
     public func data(
         forTile tile: MapTile,
-        options: VectorTileExportOptions)
+        options: VectorTile.ExportOptions)
         async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?)
     {
         let tileAndPerformanceData = try await mvt(forTile: tile, options: options)
@@ -146,7 +146,7 @@ public final class MVTPostgis {
     /// - Note: Only `bufferSize` from `options` will be used here.
     public func mvt(
         forTile tile: MapTile,
-        options: VectorTileExportOptions? = nil)
+        options: VectorTile.ExportOptions? = nil)
         async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?)
     {
         if Task.isCancelled {

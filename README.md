@@ -44,7 +44,6 @@ Please create an issue or open a pull request with a fix
 
 - Restart queries after timeout
 - Explore ST_AsMVTGeom
-- Define a JSON source format
 - Documentation (!)
 - Tests
 
