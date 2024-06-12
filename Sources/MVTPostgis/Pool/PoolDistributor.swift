@@ -28,16 +28,16 @@ actor PoolDistributor {
             password: layer.datasource.password,
             database: layer.datasource.databaseName,
             tls: .disable)
-        var poolConfiguration = PoolConfiguration(
+        let poolConfiguration = PoolConfiguration(
             applicationName: configuration.applicationName,
             postgresConfiguration: postgresConfiguration,
             connectTimeout: configuration.connectTimeout,
             queryTimeout: configuration.queryTimeout,
             poolSize: configuration.poolSize,
-            maxIdleConnections: configuration.maxIdleConnections)
-        poolConfiguration.onOpenConnection = { connection, logger in
-            try await connection.query(PostgresQuery(stringLiteral: "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"), logger: logger)
-        }
+            maxIdleConnections: configuration.maxIdleConnections,
+            onOpenConnection: { connection, logger in
+                try await connection.query(PostgresQuery(stringLiteral: "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"), logger: logger)
+            })
 
         // Note: Do not make PostgresConnectionPool.init async,
         // or there will be a race condition here.
@@ -49,7 +49,7 @@ actor PoolDistributor {
     func connection(
         forLayer layer: PostgisLayer,
         batchId: Int,
-        callback: (PostgresConnectionWrapper) async throws -> Void)
+        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void)
         async throws
     {
         let pool = await pool(forLayer: layer)

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Some statistics about query performance of one (Postgis) layer.
-public struct MVTLayerPerformanceData {
+public struct MVTLayerPerformanceData: Sendable {
 
     /// The total query runtime (Postgis + parsing).
     public let runtime: TimeInterval

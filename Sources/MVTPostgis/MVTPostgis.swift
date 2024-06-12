@@ -1,3 +1,4 @@
+import Atomics
 import Foundation
 import GISTools
 import MVTTools
@@ -14,10 +15,10 @@ import PostgresConnectionPool
 public final class MVTPostgis {
 
     /// **MUST** be changed before first use. See ``MVTPostgisConfiguration``.
-    public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
+    nonisolated(unsafe) public static let configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
 
     private static let postgisDatasourceTypeCode = "postgis"
-    private static var batchId: Int = 0
+    private static let batchId: ManagedAtomic<Int> = .init(0)
 
     /// The minimum zoom of the datasource.
     public let minZoom: Int
@@ -153,9 +154,7 @@ public final class MVTPostgis {
             throw MVTPostgisError.cancelled
         }
 
-        // TODO: Serialize access
-        let nextBatchId = MVTPostgis.batchId
-        MVTPostgis.batchId += 1
+        let nextBatchId = MVTPostgis.batchId.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
 
         return try await withThrowingTaskGroup(
             of: (String, String, [Feature], MVTLayerPerformanceData).self,
