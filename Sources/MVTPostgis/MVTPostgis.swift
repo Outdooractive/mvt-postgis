@@ -15,7 +15,7 @@ import PostgresConnectionPool
 public final class MVTPostgis {
 
     /// **MUST** be changed before first use. See ``MVTPostgisConfiguration``.
-    nonisolated(unsafe) public static let configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
+    nonisolated(unsafe) public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
 
     private static let postgisDatasourceTypeCode = "postgis"
     private static let batchId: ManagedAtomic<Int> = .init(0)
