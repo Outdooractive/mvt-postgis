@@ -11,13 +11,13 @@ let package = Package(
         .library(name: "MVTPostgis", targets: ["MVTPostgis"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "1.7.0"),
-        .package(url: "https://github.com/Outdooractive/gis-tools", from: "1.7.0"),
-        .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "0.8.0"),
-        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.5"),
+        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "1.8.5"),
+        .package(url: "https://github.com/Outdooractive/gis-tools", from: "1.8.4"),
+        .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "0.8.1"),
+        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.22.1"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.1.1"),
         .package(url: "https://github.com/yahoojapan/SwiftyXMLParser", from: "5.6.0"),
-        .package(url: "https://github.com/jpsim/Yams", from: "4.0.6"),
+        .package(url: "https://github.com/jpsim/Yams", from: "5.1.3"),
     ],
     targets: [
         .target(

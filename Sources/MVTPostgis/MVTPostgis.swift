@@ -180,7 +180,7 @@ public final class MVTPostgis {
                 for layer in source.layers {
                     let bounds = try queryBounds(
                         tile: tile,
-                        tileSize: options?.tileSize ?? 256, // pixels
+                        tileSize: VectorTile.ExportOptions.tileSize, // pixels
                         bufferSize: layer.properties.bufferSize) // pixels
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
