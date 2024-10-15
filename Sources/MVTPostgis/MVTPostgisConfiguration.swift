@@ -28,6 +28,9 @@ public struct MVTPostgisConfiguration {
     /// Controls if and how much features are simplified.
     public let simplification: ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption)
 
+    /// Controls whether `ST_MakeValid` should be applied to each geometry.
+    public let validation: ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption)
+
     /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
 
@@ -38,8 +41,9 @@ public struct MVTPostgisConfiguration {
         tileTimeout: TimeInterval = 60.0,
         poolSize: Int = 10,
         maxIdleConnections: Int? = nil,
-        clipping: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _,_  in .postgis },
-        simplification: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _,_  in .none },
+        clipping: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _  in .postgis },
+        simplification: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
+        validation: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
         trackRuntimes: Bool = false)
     {
         self.applicationName = applicationName
@@ -50,6 +54,7 @@ public struct MVTPostgisConfiguration {
         self.maxIdleConnections = maxIdleConnections?.atLeast(0)
         self.clipping = clipping
         self.simplification = simplification
+        self.validation = validation
         self.trackRuntimes = trackRuntimes
     }
 
@@ -80,9 +85,31 @@ public enum MVTSimplificationOption {
     case none
     /// Do the simplification locally, before adding features to the vector tile.
     case local
-    /// Do the simplification in Postgis with `ST_Simplify`.
+    /// Do the simplification in Postgis with `ST_Simplify` and a
+    /// simplification distance that depends on the zoom level.
     case postgis(preserveCollapsed: Bool)
     /// Simplification distance in meters, forwarded to `ST_Simplify`.
     case meters(Double, preserveCollapsed: Bool)
+
+}
+
+// MARK: - Validation
+
+/// Controls whether `ST_MakeValid` should be applied to each geometry.
+public enum MVTMakeValidOption {
+
+    /// No validation will be done.
+    case none
+    /// Same as `linework`.
+    case `default`
+    /// Builds valid geometries by first extracting all lines, noding that linework together,
+    /// then building a value output from the linework.
+    case linework
+    /// "structure" is an algorithm that distinguishes between interior and exterior rings,
+    /// building a new geometry by unioning exterior rings, and then differencing all interior rings.
+    ///
+    /// "keepcollapsed" controls whether geometry components that collapse to a lower dimensionality,
+    /// for example a one-point linestring should be dropped.
+    case structure(keepCollapsed: Bool)
 
 }

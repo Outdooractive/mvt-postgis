@@ -192,11 +192,16 @@ public final class MVTPostgis {
                     let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
                     let simplificationOption = MVTPostgis.configuration.simplification(tile.z, self.source)
                     let clippingOption = MVTPostgis.configuration.clipping(tile.z, self.source)
+                    let validationOption = MVTPostgis.configuration.validation(tile.z, self.source)
                     var columns = layer.fields.keys.map({ "\"\($0)\"" })
                     var useLocalSimplification = false
 
                     // Assemble the geometry query
                     var postgisGeometryColumn = "ST_AsBinary("
+                    switch validationOption {
+                    case .none: break
+                    default: postgisGeometryColumn.append("ST_MakeValid(")
+                    }
                     switch simplificationOption {
                     case .postgis, .meters(_, _): postgisGeometryColumn.append("ST_Simplify(")
                     case .local: useLocalSimplification = true
@@ -223,7 +228,13 @@ public final class MVTPostgis {
                         }
                         postgisGeometryColumn.append(")")
                     }
-                    postgisGeometryColumn.append(") AS \"\(geometryField)\"")
+                    postgisGeometryColumn.append(")")
+                    switch validationOption {
+                    case .none, .`default`, .linework: break
+                    case let .structure(keepCollapsed):
+                        postgisGeometryColumn.append(", 'method=structure keepcollapsed=\(keepCollapsed)')")
+                    }
+                    postgisGeometryColumn.append(" AS \"\(geometryField)\"")
                     columns.append(postgisGeometryColumn)
 
                     // The final query
