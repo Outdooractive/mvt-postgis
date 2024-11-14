@@ -228,12 +228,15 @@ public final class MVTPostgis {
                         }
                         postgisGeometryColumn.append(")")
                     }
-                    postgisGeometryColumn.append(")")
                     switch validationOption {
-                    case .none, .`default`, .linework: break
+                    case .none:
+                        break
+                    case .`default`, .linework:
+                        postgisGeometryColumn.append(")")
                     case let .structure(keepCollapsed):
                         postgisGeometryColumn.append(", 'method=structure keepcollapsed=\(keepCollapsed)')")
                     }
+                    postgisGeometryColumn.append(")")
                     postgisGeometryColumn.append(" AS \"\(geometryField)\"")
                     columns.append(postgisGeometryColumn)
 
