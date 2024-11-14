@@ -413,6 +413,9 @@ public final class MVTPostgis {
                                 properties[field.columnName] = array.compactMap({ $0.string })
                             }
 
+                        case .uuid:
+                            properties[field.columnName] = row[data: field.columnName].string
+
                         case .int2, .int4, .int8:
                             properties[field.columnName] = row[data: field.columnName].int
                         case .int2Array, .int4Array, .int8Array:
