@@ -418,6 +418,10 @@ public final class MVTPostgis {
 
                         case .uuid:
                             properties[field.columnName] = row[data: field.columnName].string
+                        case .uuidArray:
+                            if let array = row[data: field.columnName].array {
+                                properties[field.columnName] = array.compactMap({ $0.string })
+                            }
 
                         case .int2, .int4, .int8:
                             properties[field.columnName] = row[data: field.columnName].int
