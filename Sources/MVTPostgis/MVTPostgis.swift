@@ -444,6 +444,13 @@ public final class MVTPostgis {
                                 properties[field.columnName] = array.map({ $0.bool })
                             }
 
+                        case .date, .timestamp, .timestamptz:
+                            properties[field.columnName] = row[data: field.columnName].date?.ISO8601Format()
+                        case .dateArray, .timestampArray, .timestamptzArray:
+                            if let array = row[data: field.columnName].array {
+                                properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format })
+                            }
+
                         default:
                             // select * from pg_type where oid = ?;
                             // Please open an issue if you need more
