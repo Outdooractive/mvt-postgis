@@ -471,7 +471,7 @@ public final class MVTPostgis {
                         sourceProjection: projection,
                         targetProjection: projection,
                         id: featureId,
-                        properties: properties)?.rewinded
+                        properties: properties)
 
                     guard let feature else {
                         invalidFeatures += 1
