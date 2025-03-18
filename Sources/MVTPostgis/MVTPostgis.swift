@@ -253,6 +253,7 @@ public final class MVTPostgis {
                             projection: self.projection,
                             clipBounds: clipBounds,
                             simplificationTolerance: localSimplificationTolerance,
+                            featureMapping: MVTPostgis.configuration.featureMapping,
                             batchId: nextBatchId)
                         return (layer.id, layer.datasource.databaseName, features, performanceData)
                     }
@@ -366,6 +367,7 @@ public final class MVTPostgis {
         projection: Projection,
         clipBounds: BoundingBox?,
         simplificationTolerance: Double?,
+        featureMapping: ((_ feature: Feature) -> Feature)?,
         batchId: Int)
         async throws -> (features: [Feature], performance: MVTLayerPerformanceData)
     {
@@ -473,9 +475,13 @@ public final class MVTPostgis {
                         id: featureId,
                         properties: properties)
 
-                    guard let feature else {
+                    guard var feature else {
                         invalidFeatures += 1
                         continue
+                    }
+
+                    if let featureMapping {
+                        feature = featureMapping(feature)
                     }
 
                     if let clipBounds, let simplificationTolerance {

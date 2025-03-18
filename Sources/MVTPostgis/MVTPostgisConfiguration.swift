@@ -1,4 +1,5 @@
 import Foundation
+import GISTools
 
 /// Global configuration for the MVT Postgis adapter.
 public struct MVTPostgisConfiguration {
@@ -31,6 +32,9 @@ public struct MVTPostgisConfiguration {
     /// Controls whether `ST_MakeValid` should be applied to each geometry.
     public let validation: ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption)
 
+    /// Allows to update `Feature`s directly after creation (i.e. before clipping/simplification)
+    public let featureMapping: ((_ feature: Feature) -> Feature)?
+
     /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
 
@@ -44,6 +48,7 @@ public struct MVTPostgisConfiguration {
         clipping: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _  in .postgis },
         simplification: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
         validation: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
+        featureMapping: ((_ feature: Feature) -> Feature)? = nil,
         trackRuntimes: Bool = false)
     {
         self.applicationName = applicationName
@@ -55,6 +60,7 @@ public struct MVTPostgisConfiguration {
         self.clipping = clipping
         self.simplification = simplification
         self.validation = validation
+        self.featureMapping = featureMapping
         self.trackRuntimes = trackRuntimes
     }
 
