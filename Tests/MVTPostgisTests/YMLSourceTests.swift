@@ -1,9 +1,9 @@
 import Foundation
 import GISTools
 @testable import MVTPostgis
-import XCTest
+import Testing
 
-final class YMLSourceTests: XCTestCase {
+struct YMLSourceTests {
 
     private static let ymlSource = """
     name: Test Source
@@ -41,39 +41,40 @@ final class YMLSourceTests: XCTestCase {
             (SELECT type, geometry FROM some_table) AS data
     """
 
-    func testYMLSource() throws {
-        let data = try XCTUnwrap(YMLSourceTests.ymlSource.data(using: .utf8))
+    @Test
+    func YMLSource() throws {
+        let data = try #require(YMLSourceTests.ymlSource.data(using: .utf8))
         let source = try PostgisSource.load(from: data, layerWhitelist: nil)
 
-        XCTAssertEqual(source.name, "Test Source")
-        XCTAssertEqual(source.description, "A test source for testing")
-        XCTAssertEqual(source.attribution, "Here goes the copyright")
-        XCTAssertEqual(source.center, Coordinate3D(latitude: 47.56, longitude: 10.22))
-        XCTAssertEqual(source.defaultZoom, 10)
-        XCTAssertEqual(source.minZoom, 1)
-        XCTAssertEqual(source.maxZoom, 16)
-        XCTAssertEqual(source.layers.count, 1)
+        #expect(source.name == "Test Source")
+        #expect(source.description == "A test source for testing")
+        #expect(source.attribution == "Here goes the copyright")
+        #expect(source.center == Coordinate3D(latitude: 47.56, longitude: 10.22))
+        #expect(source.defaultZoom == 10)
+        #expect(source.minZoom == 1)
+        #expect(source.maxZoom == 16)
+        #expect(source.layers.count == 1)
 
-        let layer = try XCTUnwrap(source.layers.first)
-        XCTAssertEqual(layer.id, "First layer")
-        XCTAssertEqual(layer.description, "This is the first layer")
-        XCTAssertEqual(layer.fields.count, 1)
-        XCTAssertTrue(layer.fields.hasKey("type"))
-        XCTAssertEqual(layer.properties.bufferSize, 128)
+        let layer = try #require(source.layers.first)
+        #expect(layer.id == "First layer")
+        #expect(layer.description == "This is the first layer")
+        #expect(layer.fields.count == 1)
+        #expect(layer.fields.hasKey("type"))
+        #expect(layer.properties.bufferSize == 128)
 
         let datasource = layer.datasource
-        XCTAssertEqual(datasource.user, "user")
-        XCTAssertEqual(datasource.password, "password")
-        XCTAssertEqual(datasource.host, "host")
-        XCTAssertEqual(datasource.port, 5432)
-        XCTAssertEqual(datasource.databaseName, "osm")
-        XCTAssertEqual(datasource.geometryField, "geometry")
-        XCTAssertEqual(datasource.boundingBox, BoundingBox(
+        #expect(datasource.user == "user")
+        #expect(datasource.password == "password")
+        #expect(datasource.host == "host")
+        #expect(datasource.port == 5432)
+        #expect(datasource.databaseName == "osm")
+        #expect(datasource.geometryField == "geometry")
+        #expect(datasource.boundingBox == BoundingBox(
             southWest: Coordinate3D(latitude: 47.0, longitude: 10.0),
             northEast: Coordinate3D(latitude: 48.0, longitude: 11.0)))
-        XCTAssertEqual(datasource.srid, .epsg4326)
-        XCTAssertEqual(datasource.type, "postgis")
-        XCTAssertEqual(datasource.sql, "(SELECT type, geometry FROM some_table) AS data")
+        #expect(datasource.srid == .epsg4326)
+        #expect(datasource.type == "postgis")
+        #expect(datasource.sql == "(SELECT type, geometry FROM some_table) AS data")
     }
 
 }

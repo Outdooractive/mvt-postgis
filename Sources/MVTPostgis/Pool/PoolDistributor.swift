@@ -49,7 +49,7 @@ actor PoolDistributor {
     func connection(
         forLayer layer: PostgisLayer,
         batchId: Int,
-        callback: (PostgresConnectionWrapper) async throws -> Void)
+        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void)
         async throws
     {
         let pool = await pool(forLayer: layer)

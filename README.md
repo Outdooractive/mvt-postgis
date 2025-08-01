@@ -7,13 +7,13 @@ Creates vector tiles from Postgis databases.
 
 ## Requirements
 
-This package requires Swift 5.9 or higher (at least Xcode 13), and compiles on macOS (\>= macOS 13) as well as Linux.
+This package requires Swift 5.10 or higher (at least Xcode 14), and compiles on macOS (\>= macOS 14) as well as Linux.
 
 ## Installation with Swift Package Manager
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "1.0.5"),
+    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "1.2.4"),
 ],
 targets: [
     .target(name: "MyTarget", dependencies: [
