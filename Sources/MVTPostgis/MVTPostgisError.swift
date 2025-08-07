@@ -3,6 +3,7 @@ import PostgresNIO
 
 /// Possible errors thrown from the *MVTPostgis* library.
 public enum MVTPostgisError: Error {
+
     /// The request was cancelled.
     case cancelled
     /// The connection to the database was unexpectedly closed.
@@ -21,4 +22,5 @@ public enum MVTPostgisError: Error {
     case wrongDatasourceType(message: String)
     /// XML parsing error, see `message` for more details.
     case xmlError(message: String)
+
 }

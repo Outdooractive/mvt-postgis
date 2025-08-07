@@ -9,9 +9,7 @@ actor PoolDistributor {
     private let logger: Logger
     private let configuration: MVTPostgisConfiguration
 
-    init(configuration: MVTPostgisConfiguration,
-         logger: Logger)
-    {
+    init(configuration: MVTPostgisConfiguration, logger: Logger) {
         self.logger = logger
         self.configuration = configuration
     }
@@ -49,9 +47,8 @@ actor PoolDistributor {
     func connection(
         forLayer layer: PostgisLayer,
         batchId: Int,
-        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void)
-        async throws
-    {
+        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void
+    ) async throws {
         let pool = await pool(forLayer: layer)
 
         do {

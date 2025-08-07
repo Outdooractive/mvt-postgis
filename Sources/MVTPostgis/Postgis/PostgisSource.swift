@@ -29,9 +29,8 @@ public struct PostgisSource: Codable {
     /// Load a source from an URL, can either be JSON, or Mapnik YML or XML.
     public static func load(
         from url: URL,
-        layerWhitelist: [String]?)
-        throws -> PostgisSource
-    {
+        layerWhitelist: [String]?
+    ) throws -> PostgisSource {
         let data = try Data(contentsOf: url)
         return try load(from: data, layerWhitelist: layerWhitelist)
     }
@@ -39,9 +38,8 @@ public struct PostgisSource: Codable {
     /// Load a source from a Data object, can either be JSON, or Mapnik YML or XML.
     public static func load(
         from data: Data,
-        layerWhitelist: [String]?)
-        throws -> PostgisSource
-    {
+        layerWhitelist: [String]?
+    ) throws -> PostgisSource {
         if data.starts(with: [0x7B]) {
             return try JSONDecoder().decode(PostgisSource.self, from: data)
         }

@@ -49,8 +49,8 @@ public struct MVTPostgisConfiguration {
         simplification: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
         validation: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
         featureMapping: ((_ feature: Feature) -> Feature)? = nil,
-        trackRuntimes: Bool = false)
-    {
+        trackRuntimes: Bool = false
+    ) {
         self.applicationName = applicationName
         self.connectTimeout = connectTimeout.atLeast(1.0)
         self.queryTimeout = queryTimeout?.atLeast(1.0)

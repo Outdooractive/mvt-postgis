@@ -11,17 +11,21 @@ public struct MVTLayerPerformanceData: Sendable {
     public let features: Int
     /// The number of invalid features in a layer.
     public let invalidFeatures: Int
+    /// The SQL query used.
+    public let sqlQuery: String
 
     public init(
         runtime: TimeInterval,
         wkbBytes: Int64,
         features: Int,
-        invalidFeatures: Int)
-    {
+        invalidFeatures: Int,
+        sqlQuery: String
+    ) {
         self.runtime = runtime
         self.wkbBytes = wkbBytes
         self.features = features
         self.invalidFeatures = invalidFeatures
+        self.sqlQuery = sqlQuery
     }
 
 }

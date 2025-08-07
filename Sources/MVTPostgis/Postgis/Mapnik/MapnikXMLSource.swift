@@ -7,18 +7,16 @@ struct MapnikXMLSource {
 
     static func load(
         from url: URL,
-        layerAllowlist: [String])
-        throws -> PostgisSource
-    {
+        layerAllowlist: [String]
+    ) throws -> PostgisSource {
         let data = try Data(contentsOf: url)
         return try load(from: data, layerAllowlist: layerAllowlist)
     }
 
     static func load(
         from data: Data,
-        layerAllowlist: [String])
-        throws -> PostgisSource
-    {
+        layerAllowlist: [String]
+    ) throws -> PostgisSource {
         let xmlParser = XML.parse(data)
 
         var name = ""

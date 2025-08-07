@@ -47,9 +47,8 @@ public final class MVTPostgis {
         sourceURL: URL,
         externalName: String? = nil,
         layerWhitelist: [String]? = nil,
-        logger: Logger? = nil)
-        throws
-    {
+        logger: Logger? = nil
+    ) throws {
         let source = try PostgisSource.load(
             from: sourceURL,
             layerWhitelist: layerWhitelist)
@@ -65,9 +64,8 @@ public final class MVTPostgis {
         sourceData: Data,
         externalName: String? = nil,
         layerWhitelist: [String]? = nil,
-        logger: Logger? = nil)
-        throws
-    {
+        logger: Logger? = nil
+    ) throws {
         let source = try PostgisSource.load(
             from: sourceData,
             layerWhitelist: layerWhitelist)
@@ -82,9 +80,8 @@ public final class MVTPostgis {
     public init(
         source: PostgisSource,
         externalName: String? = nil,
-        logger: Logger? = nil)
-        throws
-    {
+        logger: Logger? = nil
+    ) throws {
         guard source.layers.count > 0 else { throw MVTPostgisError.needLayers }
 
         guard source.layers.allSatisfy({ $0.datasource.type == MVTPostgis.postgisDatasourceTypeCode }) else {
@@ -135,9 +132,8 @@ public final class MVTPostgis {
     /// - Note: Only `bufferSize` from `options` will be used here.
     public func data(
         forTile tile: MapTile,
-        options: VectorTile.ExportOptions)
-        async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?)
-    {
+        options: VectorTile.ExportOptions
+    ) async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?) {
         let tileAndPerformanceData = try await mvt(forTile: tile, options: options)
         return (tileAndPerformanceData.tile.data(options: options), tileAndPerformanceData.performance)
     }
@@ -147,9 +143,8 @@ public final class MVTPostgis {
     /// - Note: Only `bufferSize` from `options` will be used here.
     public func mvt(
         forTile tile: MapTile,
-        options: VectorTile.ExportOptions? = nil)
-        async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?)
-    {
+        options: VectorTile.ExportOptions? = nil
+    ) async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) {
         if Task.isCancelled {
             throw MVTPostgisError.cancelled
         }
@@ -282,7 +277,7 @@ public final class MVTPostgis {
                         self?.logger.info("\(self?.externalName ?? self?.source.name ?? "n/a"): Batch \(nextBatchId) (\(tile.z)/\(tile.x)/\(tile.y)) timed out after \(MVTPostgis.configuration.tileTimeout) seconds:\n\(timedOutQueries.joined(separator: "\n"))")
                         throw MVTPostgisError.tileTimedOut(queries: timedOutQueries)
                     }
-                    return ("", "", [], MVTLayerPerformanceData(runtime: 0.0, wkbBytes: 0, features: 0, invalidFeatures: 0))
+                    return ("", "", [], MVTLayerPerformanceData(runtime: 0.0, wkbBytes: 0, features: 0, invalidFeatures: 0, sqlQuery: ""))
                 }
 
                 var layerIdToRuntimeMapping: [String: MVTLayerPerformanceData]?
@@ -322,9 +317,8 @@ public final class MVTPostgis {
     private func queryBounds(
         tile: MapTile,
         tileSize: Int,
-        bufferSize: Int) // pixels
-        throws -> BoundingBox
-    {
+        bufferSize: Int // pixels
+    ) throws -> BoundingBox {
         var bounds: BoundingBox
 
         switch projection {
@@ -353,9 +347,8 @@ public final class MVTPostgis {
 
     private func simplificationTolerance(
         pixelWidth: Double,
-        atZoom zoom: Int)
-        -> Double
-    {
+        atZoom zoom: Int
+    ) -> Double {
         // pixelWidth at zoom 10
         pixelWidth * ((((0.6 - 1.4) / 20.0) * Double(zoom)) + 1.4)
     }
@@ -368,15 +361,14 @@ public final class MVTPostgis {
         clipBounds: BoundingBox?,
         simplificationTolerance: Double?,
         featureMapping: ((_ feature: Feature) -> Feature)?,
-        batchId: Int)
-        async throws -> (features: [Feature], performance: MVTLayerPerformanceData)
-    {
+        batchId: Int
+    ) async throws -> (features: [Feature], performance: MVTLayerPerformanceData) {
         if Task.isCancelled {
             throw MVTPostgisError.cancelled
         }
 
-        var features: [Feature] = []
-        var runtime: TimeInterval = 0.0
+        let features = ThreadSafeArrayCollector<Feature>()
+        let runtime = ThreadSafeObjectCollector<TimeInterval>(0.0)
         var wkbBytes: Int64 = 0
         var invalidFeatures: Int = 0
 
@@ -506,17 +498,17 @@ public final class MVTPostgis {
                     }
                 }
 
-                runtime = fabs(startTimestamp.timeIntervalSinceNow)
+                runtime.set(fabs(startTimestamp.timeIntervalSinceNow))
             })
 
-        logger.debug("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(features.count) feature(s) (\(invalidFeatures) invalid) in \(runtime.rounded(toPlaces: 3))s (\(wkbBytes) bytes)")
+        logger.debug("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(features.count) feature(s) (\(invalidFeatures) invalid) in \((runtime.item).rounded(toPlaces: 3))s (\(wkbBytes) bytes)")
 
 //        if invalidFeatures > 0, logger.logLevel > .debug {
 //            logger.info("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(invalidFeatures) invalid features")
 //        }
 
         // Features will be projected to EPSG:4326
-        return (features, MVTLayerPerformanceData(runtime: runtime, wkbBytes: wkbBytes, features: features.count, invalidFeatures: invalidFeatures))
+        return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes, features: features.count, invalidFeatures: invalidFeatures, sqlQuery: query))
     }
 
 }
