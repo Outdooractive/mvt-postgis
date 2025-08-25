@@ -2,7 +2,7 @@ import Foundation
 import GISTools
 
 /// A  datasource, part of Postgis layers.
-public struct PostgisDatasource: Codable {
+public struct PostgisDatasource: Codable, Sendable {
 
     /// The PostgreSQL user.
     public let user: String

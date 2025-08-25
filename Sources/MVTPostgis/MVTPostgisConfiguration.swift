@@ -2,7 +2,7 @@ import Foundation
 import GISTools
 
 /// Global configuration for the MVT Postgis adapter.
-public struct MVTPostgisConfiguration {
+public struct MVTPostgisConfiguration: Sendable {
 
     /// The name used for database connections and the default logger (default: 'MVTPostgis').
     public let applicationName: String
@@ -24,16 +24,16 @@ public struct MVTPostgisConfiguration {
     public let maxIdleConnections: Int?
 
     /// Controls if and where the clipping of features happens.
-    public let clipping: ((_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption)
+    public let clipping: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption)
 
     /// Controls if and how much features are simplified.
-    public let simplification: ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption)
+    public let simplification: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption)
 
     /// Controls whether `ST_MakeValid` should be applied to each geometry.
-    public let validation: ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption)
+    public let validation: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption)
 
     /// Allows to update `Feature`s directly after creation (i.e. before clipping/simplification)
-    public let featureMapping: ((_ feature: Feature) -> Feature)?
+    public let featureMapping: (@Sendable (_ feature: Feature) -> Feature)?
 
     /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
@@ -45,10 +45,10 @@ public struct MVTPostgisConfiguration {
         tileTimeout: TimeInterval = 60.0,
         poolSize: Int = 10,
         maxIdleConnections: Int? = nil,
-        clipping: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _  in .postgis },
-        simplification: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
-        validation: @escaping ((_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
-        featureMapping: ((_ feature: Feature) -> Feature)? = nil,
+        clipping: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _  in .postgis },
+        simplification: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
+        validation: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
+        featureMapping: (@Sendable (_ feature: Feature) -> Feature)? = nil,
         trackRuntimes: Bool = false
     ) {
         self.applicationName = applicationName
@@ -69,7 +69,7 @@ public struct MVTPostgisConfiguration {
 // MARK: - Clipping
 
 /// Controls if and where the clipping of features happens.
-public enum MVTClippingOption {
+public enum MVTClippingOption: Sendable {
 
     /// No clipping, all features are added to the vector tile as they come from
     /// the database. Clipping will then be done when serializing the tile.
@@ -85,7 +85,7 @@ public enum MVTClippingOption {
 // MARK: - Simplification
 
 /// Controls if and how much features are simplified.
-public enum MVTSimplificationOption {
+public enum MVTSimplificationOption: Sendable {
 
     /// No simplification will be done.
     case none
@@ -102,7 +102,7 @@ public enum MVTSimplificationOption {
 // MARK: - Validation
 
 /// Controls whether `ST_MakeValid` should be applied to each geometry.
-public enum MVTMakeValidOption {
+public enum MVTMakeValidOption: Sendable {
 
     /// No validation will be done.
     case none

@@ -2,10 +2,10 @@ import Foundation
 import GISTools
 
 /// A  Layer, part of a Postgis source.
-public struct PostgisLayer: Codable {
+public struct PostgisLayer: Codable, Sendable {
 
     /// Some layer properties.
-    public struct Properties: Codable {
+    public struct Properties: Codable, Sendable {
         /// The buffer around a tile in pixels.
         public let bufferSize: Int
     }

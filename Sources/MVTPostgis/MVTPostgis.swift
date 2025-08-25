@@ -12,10 +12,11 @@ import PostgresConnectionPool
 
 /// A tool for creating vector tiles from Postgis datasources.
 /// Accepts YML and XML sources (as used by Mapnik and the old Mapbox Studio), and new JSON sources.
-public final class MVTPostgis {
+public final class MVTPostgis: Sendable {
 
     /// **MUST** be changed before first use. See ``MVTPostgisConfiguration``.
-    nonisolated(unsafe) public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
+    nonisolated(unsafe)
+    public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
 
     private static let postgisDatasourceTypeCode = "postgis"
     private static let batchId: ManagedAtomic<Int> = .init(0)
