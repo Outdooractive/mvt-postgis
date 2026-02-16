@@ -181,9 +181,9 @@ public final class MVTPostgis: Sendable {
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
                     let sql = layer.datasource.sql
-                        .replacingOccurrences(of: "!bbox!", with: envelope)
-                        .replacingOccurrences(of: "!scale_denominator!", with: String(scaleDenominator))
-                        .replacingOccurrences(of: "!pixel_width!", with: String(pixelWidth))
+                        .replacing("!bbox!", with: envelope)
+                        .replacing("!scale_denominator!", with: String(scaleDenominator))
+                        .replacing("!pixel_width!", with: String(pixelWidth))
 
                     let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
                     let simplificationOption = MVTPostgis.configuration.simplification(tile.z, self.source)
