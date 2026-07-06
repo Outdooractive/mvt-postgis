@@ -87,4 +87,43 @@ struct JSONSourceTests {
         #expect(datasource.sql == "(SELECT type, geometry FROM some_table) AS data")
     }
 
+    @Test
+    func JSONSourceWithoutBoundingBox() async throws {
+        let json = """
+        {
+          "name": "No BBox Source",
+          "description": "",
+          "attribution": "",
+          "center": [0, 0],
+          "defaultZoom": 10,
+          "minZoom": 1,
+          "maxZoom": 16,
+          "layers": [
+            {
+              "id": "layer",
+              "description": null,
+              "fields": {},
+              "properties": { "bufferSize": 0 },
+              "datasource": {
+                "user": "u",
+                "password": "p",
+                "host": "h",
+                "port": 5432,
+                "databaseName": "osm",
+                "geometryField": null,
+                "srid": 4326,
+                "type": "postgis",
+                "sql": "SELECT * FROM table"
+              }
+            }
+          ]
+        }
+        """
+        let data = try #require(json.data(using: .utf8))
+        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        #expect(source.layers.count == 1)
+        #expect(source.layers.first?.datasource.boundingBox == nil)
+        #expect(source.layers.first?.datasource.geometryField == nil)
+    }
+
 }
