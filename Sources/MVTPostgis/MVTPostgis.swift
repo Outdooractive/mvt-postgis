@@ -186,6 +186,14 @@ public final class MVTPostgis: Sendable {
                         tile: tile,
                         tileSize: VectorTile.ExportOptions.tileSize, // pixels
                         bufferSize: layer.properties.bufferSize) // pixels
+
+                    // Skip layers whose bounding box doesn't intersect the tile
+                    if let projectedBox = layer.datasource.boundingBox?.projected(to: projection),
+                       !projectedBox.intersects(bounds)
+                    {
+                        continue
+                    }
+
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
                     let sql = layer.datasource.sql
