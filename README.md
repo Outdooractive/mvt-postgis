@@ -143,6 +143,74 @@ layers:
 </Layer>
 ```
 
+### JSON source format
+
+The JSON format mirrors the `PostgisSource` → `PostgisLayer` → `PostgisDatasource` Codable structure:
+
+```json
+{
+  "name": "Test Source",
+  "description": "A test source for testing",
+  "attribution": "Here goes the copyright",
+  "center": [10.22, 47.56],
+  "defaultZoom": 10,
+  "minZoom": 1,
+  "maxZoom": 16,
+  "layers": [
+    {
+      "id": "First layer",
+      "description": "Optional layer description",
+      "fields": {
+        "type": "Description of the type field",
+        "geometry": ""
+      },
+      "properties": {
+        "bufferSize": 128
+      },
+      "datasource": {
+        "user": "postgres",
+        "password": "secret",
+        "host": "localhost",
+        "port": 5432,
+        "databaseName": "gis",
+        "geometryField": "geometry",
+        "boundingBox": [10, 47, 11, 48],
+        "srid": 4326,
+        "type": "postgis",
+        "sql": "(SELECT type, geometry FROM some_table WHERE geometry && !bbox!) AS data"
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Source name |
+| `description` | string | Source description |
+| `attribution` | string | Copyright attribution |
+| `center` | [lon, lat] | Default center coordinate |
+| `defaultZoom` | integer | Default zoom level |
+| `minZoom` | integer | Minimum zoom |
+| `maxZoom` | integer | Maximum zoom |
+| `layers[]` | array | Array of layer definitions |
+| `layers[].id` | string | Layer name |
+| `layers[].description` | string? | Optional layer description |
+| `layers[].fields` | object | Map of field names to descriptions |
+| `layers[].properties.bufferSize` | integer | Tile buffer in pixels |
+| `layers[].datasource.user` | string | PostgreSQL user |
+| `layers[].datasource.password` | string | PostgreSQL password |
+| `layers[].datasource.host` | string | PostgreSQL hostname |
+| `layers[].datasource.port` | integer | PostgreSQL port |
+| `layers[].datasource.databaseName` | string | Database name |
+| `layers[].datasource.geometryField` | string? | Geometry column name (default: `"geometry"`) |
+| `layers[].datasource.boundingBox` | [minLon, minLat, maxLon, maxLat]? | Datasource extent |
+| `layers[].datasource.srid` | integer | SRID (4326 or 3857) |
+| `layers[].datasource.type` | string | Must be `"postgis"` |
+| `layers[].datasource.sql` | string | SQL query with `!bbox!` placeholder |
+
+The SQL query **must** contain a `!bbox!` placeholder — it is replaced with the tile's bounding box at query time.
+
 ### Shutdown
 
 Always call `shutdown()` when done to close all database connections:
