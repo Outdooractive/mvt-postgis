@@ -128,21 +128,29 @@ public final class MVTPostgis: Sendable {
 
     // MARK: -
 
-    /// Return tile data at the given z/x/y coordinate.
+    /// Return tile data at the given z/x/y coordinate in the specified format.
     ///
     /// - Note: Only `bufferSize` from `options` will be used here.
     public func data(
         forTile tile: MapTile,
+        format: TileOutputFormat,
         options: VectorTile.ExportOptions
     ) async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?) {
-        let tileAndPerformanceData = try await mvt(forTile: tile, options: options)
-        return (tileAndPerformanceData.tile.data(options: options), tileAndPerformanceData.performance)
+        let result = try await self.vectorTile(forTile: tile, options: options)
+        let data: Data? = switch format {
+        case .mvt: result.tile.mvtData(options: options)
+        case .mlt: result.tile.mltData(options: options)
+        }
+        return (data, result.performance)
     }
 
     /// Create a tile at the given z/x/y coordinate.
     ///
+    /// Returns a ``VectorTile`` that can be encoded to any output format
+    /// via ``VectorTile/mvtData(options:)`` or ``VectorTile/mltData(options:)``.
+    ///
     /// - Note: Only `bufferSize` from `options` will be used here.
-    public func mvt(
+    public func vectorTile(
         forTile tile: MapTile,
         options: VectorTile.ExportOptions? = nil
     ) async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) {
@@ -156,7 +164,7 @@ public final class MVTPostgis: Sendable {
             of: (String, String, [Feature], MVTLayerPerformanceData).self,
             body: { group -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) in
                 // Note: Geometries loaded from WKB will always be projected to EPSG:4326
-                guard var mvt = VectorTile(tile: tile, projection: projection) else {
+                guard var tileVar = VectorTile(tile: tile, projection: projection) else {
                     throw MVTPostgisError.tileOutOfBounds
                 }
 
@@ -181,9 +189,9 @@ public final class MVTPostgis: Sendable {
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
                     let sql = layer.datasource.sql
-                        .replacingOccurrences(of: "!bbox!", with: envelope)
-                        .replacingOccurrences(of: "!scale_denominator!", with: String(scaleDenominator))
-                        .replacingOccurrences(of: "!pixel_width!", with: String(pixelWidth))
+                        .replacing("!bbox!", with: envelope)
+                        .replacing("!scale_denominator!", with: String(scaleDenominator))
+                        .replacing("!pixel_width!", with: String(pixelWidth))
 
                     let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
                     let simplificationOption = MVTPostgis.configuration.simplification(tile.z, self.source)
@@ -290,7 +298,7 @@ public final class MVTPostgis: Sendable {
                     for try await (layerId, databaseName, features, performanceData) in group {
                         guard layerId.isNotEmpty else { continue }
 
-                        mvt.appendFeatures(features, to: layerId)
+                        tileVar.appendFeatures(features, to: layerId)
 
                         if MVTPostgis.configuration.trackRuntimes {
                             layerIdToRuntimeMapping?["\(externalName ?? source.name).\(databaseName).\(layerId)"] = performanceData
@@ -309,7 +317,7 @@ public final class MVTPostgis: Sendable {
                     throw error
                 }
 
-                return (mvt, layerIdToRuntimeMapping)
+                return (tileVar, layerIdToRuntimeMapping)
             })
     }
 
@@ -329,6 +337,8 @@ public final class MVTPostgis: Sendable {
             bounds = tile.boundingBox(projection: .epsg3857)
         case .epsg4326:
             bounds = tile.boundingBox(projection: .epsg4326)
+        case .epsg4978:
+            bounds = tile.boundingBox(projection: .epsg4978)
         }
 
         if bufferSize != 0 {
@@ -361,7 +371,7 @@ public final class MVTPostgis: Sendable {
         projection: Projection,
         clipBounds: BoundingBox?,
         simplificationTolerance: Double?,
-        featureMapping: ((_ feature: Feature) -> Feature)?,
+        featureMapping: (@Sendable (_ feature: Feature) -> Feature)?,
         batchId: Int
     ) async throws -> (features: [Feature], performance: MVTLayerPerformanceData) {
         if Task.isCancelled {
@@ -370,8 +380,8 @@ public final class MVTPostgis: Sendable {
 
         let features = ThreadSafeArrayCollector<Feature>()
         let runtime = ThreadSafeObjectCollector<TimeInterval>(0.0)
-        var wkbBytes: Int64 = 0
-        var invalidFeatures: Int = 0
+        let wkbBytes = ThreadSafeObjectCollector<Int64>(0)
+        let invalidFeatures = ThreadSafeObjectCollector<Int>(0)
 
         let geometryColumn = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
         try await poolDistributor.connection(
@@ -399,7 +409,7 @@ public final class MVTPostgis: Sendable {
 
                     let geometryData = Data(buffer: geometryBytes)
 
-                    var properties: [String: Any] = [:]
+                    var properties: [String: Sendable] = [:]
                     for field in row {
                         guard field.columnName != geometryColumn else { continue }
 
@@ -453,7 +463,7 @@ public final class MVTPostgis: Sendable {
                         }
                     }
 
-                    wkbBytes += Int64(geometryData.count)
+                    wkbBytes.set(wkbBytes.item + Int64(geometryData.count))
 
                     // The vector tile spec only allows Int ids
                     var featureId: Feature.Identifier?
@@ -469,7 +479,7 @@ public final class MVTPostgis: Sendable {
                         properties: properties)
 
                     guard var feature else {
-                        invalidFeatures += 1
+                        invalidFeatures.set(invalidFeatures.item + 1)
                         continue
                     }
 
@@ -479,14 +489,14 @@ public final class MVTPostgis: Sendable {
 
                     if let clipBounds, let simplificationTolerance {
                         guard let clippedFeature = feature.clipped(to: clipBounds) else {
-                            invalidFeatures += 1
+                            invalidFeatures.set(invalidFeatures.item + 1)
                             continue
                         }
                         features.append(clippedFeature.simplified(tolerance: simplificationTolerance))
                     }
                     else if let clipBounds {
                         guard let clippedFeature = feature.clipped(to: clipBounds) else {
-                            invalidFeatures += 1
+                            invalidFeatures.set(invalidFeatures.item + 1)
                             continue
                         }
                         features.append(clippedFeature)
@@ -502,14 +512,14 @@ public final class MVTPostgis: Sendable {
                 runtime.set(fabs(startTimestamp.timeIntervalSinceNow))
             })
 
-        logger.debug("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(features.count) feature(s) (\(invalidFeatures) invalid) in \((runtime.item).rounded(toPlaces: 3))s (\(wkbBytes) bytes)")
+        logger.debug("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(features.count) feature(s) (\(invalidFeatures.item) invalid) in \((runtime.item).rounded(toPlaces: 3))s (\(wkbBytes.item) bytes)")
 
-//        if invalidFeatures > 0, logger.logLevel > .debug {
-//            logger.info("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(invalidFeatures) invalid features")
+//        if invalidFeatures.item > 0, logger.logLevel > .debug {
+//            logger.info("\(externalName ?? source.name).\(layer.datasource.databaseName).\(layer.id): \(invalidFeatures.item) invalid features")
 //        }
 
         // Features will be projected to EPSG:4326
-        return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes, features: features.count, invalidFeatures: invalidFeatures, sqlQuery: query))
+        return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes.item, features: features.count, invalidFeatures: invalidFeatures.item, sqlQuery: query))
     }
 
 }
