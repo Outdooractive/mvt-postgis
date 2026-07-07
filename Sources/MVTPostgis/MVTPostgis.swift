@@ -14,7 +14,11 @@ import PostgresConnectionPool
 /// Accepts YML and XML sources (as used by Mapnik and the old Mapbox Studio), and new JSON sources.
 public final class MVTPostgis: Sendable {
 
-    /// **MUST** be changed before first use. See ``MVTPostgisConfiguration``.
+    /// The default configuration for new ``MVTPostgis`` instances.
+    ///
+    /// Used when no explicit ``configuration`` is passed to the initializer.
+    /// Changes after the first instance is created have no effect on existing instances.
+    /// See ``MVTPostgisConfiguration``.
     nonisolated(unsafe)
     public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
 
@@ -38,12 +42,22 @@ public final class MVTPostgis: Sendable {
 
     // ===
 
+    private let configuration: MVTPostgisConfiguration
     private let logger: Logger
     private let poolDistributor: PoolDistributor
 
     // MARK: -
 
-    /// Initialize a MVT creator from a file or from the network.
+    /// Initialize a ``MVTPostgis`` instance from a source file URL.
+    ///
+    /// The source can be in JSON, Mapnik YML, or Mapnik XML format.
+    ///
+    /// - Parameters:
+    ///   - sourceURL: The file URL of the datasource definition.
+    ///   - externalName: An optional name used in runtime tracking and log messages.
+    ///   - layerWhitelist: Optional list of layer names to include. When `nil`, all layers are included.
+    ///   - logger: An optional logger. If `nil`, a default logger is created.
+    /// - Throws: ``MVTPostgisError`` or decoding errors from the source file.
     public convenience init(
         sourceURL: URL,
         externalName: String? = nil,
@@ -60,7 +74,16 @@ public final class MVTPostgis: Sendable {
             logger: logger)
     }
 
-    /// Initialize a MVT creator directly from a data object.
+    /// Initialize a ``MVTPostgis`` instance from raw datasource data.
+    ///
+    /// The data can be in JSON, Mapnik YML, or Mapnik XML format.
+    ///
+    /// - Parameters:
+    ///   - sourceData: The datasource definition as raw data.
+    ///   - externalName: An optional name used in runtime tracking and log messages.
+    ///   - layerWhitelist: Optional list of layer names to include. When `nil`, all layers are included.
+    ///   - logger: An optional logger. If `nil`, a default logger is created.
+    /// - Throws: ``MVTPostgisError`` or decoding errors from the source data.
     public convenience init(
         sourceData: Data,
         externalName: String? = nil,
@@ -77,10 +100,22 @@ public final class MVTPostgis: Sendable {
             logger: logger)
     }
 
-    /// Initialize a MVT creator directly with a parsed ``PostgisSource`` object.
+    /// Initialize a ``MVTPostgis`` instance with a pre-parsed ``PostgisSource``.
+    ///
+    /// This is the designated initializer. All other initializers delegate to this one.
+    ///
+    /// - Parameters:
+    ///   - source: A parsed datasource definition.
+    ///   - externalName: An optional name used in runtime tracking and log messages.
+    ///   - configuration: Optional instance-specific configuration. When `nil`, ``MVTPostgis/configuration`` is used.
+    ///   - logger: An optional logger. If `nil`, a default logger is created.
+    /// - Throws: ``MVTPostgisError/needLayers`` if the source has no layers,
+    ///   ``MVTPostgisError/wrongDatasourceType`` if a layer is not of type `"postgis"`,
+    ///   or ``MVTPostgisError/unsupportedSRID`` if the datasource uses an unsupported projection.
     public init(
         source: PostgisSource,
         externalName: String? = nil,
+        configuration: MVTPostgisConfiguration? = nil,
         logger: Logger? = nil
     ) throws {
         guard source.layers.count > 0 else { throw MVTPostgisError.needLayers }
@@ -97,31 +132,38 @@ public final class MVTPostgis: Sendable {
 
         self.source = source
         self.externalName = externalName
+        self.configuration = configuration ?? MVTPostgis.configuration
         self.minZoom = source.minZoom
         self.maxZoom = source.maxZoom
+
+        let appName = self.configuration.applicationName
         self.logger = logger ?? {
-            var logger = Logger(label: "\(MVTPostgis.configuration.applicationName).\(externalName ?? source.name)")
+            var logger = Logger(label: "\(appName).\(externalName ?? source.name)")
             logger.logLevel = .info
             return logger
         }()
         self.poolDistributor = PoolDistributor(
-            configuration: MVTPostgis.configuration,
+            configuration: self.configuration,
             logger: self.logger)
     }
 
-    /// Close all database connections.
+    /// Close all database connections and shut down all connection pools.
     ///
-    /// **MUST** be called when done with all MVTPostgis instances
+    /// **MUST** be called when done with all ``MVTPostgis`` instances.
+    /// After this call, new tile requests will re-create connections as needed.
     public func shutdown() async {
         await poolDistributor.shutdown()
     }
 
-    /// Forcibly close all idle connections in all pools.
+    /// Forcibly close all idle connections in all database pools.
+    ///
+    /// Active connections are not affected.
     public func closeIdleConnections() async {
         await poolDistributor.closeIdleConnections()
     }
 
-    /// Information about database pools and open connections.
+    /// Returns information about all active database pools and their connections.
+    /// - Returns: An array of ``PoolInfo`` structs, one per database pool.
     public func poolInfos() async -> [PoolInfo] {
         await poolDistributor.poolInfos()
     }
@@ -130,7 +172,11 @@ public final class MVTPostgis: Sendable {
 
     /// Return tile data at the given z/x/y coordinate in the specified format.
     ///
-    /// - Note: Only `bufferSize` from `options` will be used here.
+    /// - Parameters:
+    ///   - tile: The map tile to render.
+    ///   - format: The output format (`.mvt` or `.mlt`).
+    ///   - options: Export options controlling buffering and compression.
+    /// - Returns: A tuple of optional encoded tile data and optional per-layer performance statistics.
     public func data(
         forTile tile: MapTile,
         format: TileOutputFormat,
@@ -144,12 +190,16 @@ public final class MVTPostgis: Sendable {
         return (data, result.performance)
     }
 
-    /// Create a tile at the given z/x/y coordinate.
+    /// Create a tile at the given z/x/y coordinate by querying all configured layers.
     ///
     /// Returns a ``VectorTile`` that can be encoded to any output format
     /// via ``VectorTile/mvtData(options:)`` or ``VectorTile/mltData(options:)``.
     ///
-    /// - Note: Only `bufferSize` from `options` will be used here.
+    /// - Parameters:
+    ///   - tile: The map tile to render.
+    ///   - options: Export options controlling buffering (other options like compression are applied during encoding).
+    /// - Returns: A tuple of the generated ``VectorTile`` and optional per-layer performance statistics.
+    /// - Throws: ``MVTPostgisError`` if the tile is out of bounds, the request is cancelled, or a query times out.
     public func vectorTile(
         forTile tile: MapTile,
         options: VectorTile.ExportOptions? = nil
@@ -177,7 +227,7 @@ public final class MVTPostgis: Sendable {
                 let pixelWidth = tile.metersPerPixel
                 let simplificationTolerance = simplificationTolerance(pixelWidth: pixelWidth, atZoom: tile.z)
 
-                let deadline = Date(timeIntervalSinceNow: MVTPostgis.configuration.tileTimeout)
+                let deadline = Date(timeIntervalSinceNow: self.configuration.tileTimeout)
                 let expectedTasksCount = source.layers.count
                 var finishedTasksCount = 0
 
@@ -202,9 +252,9 @@ public final class MVTPostgis: Sendable {
                         .replacing("!pixel_width!", with: String(pixelWidth))
 
                     let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
-                    let simplificationOption = MVTPostgis.configuration.simplification(tile.z, self.source)
-                    let clippingOption = MVTPostgis.configuration.clipping(tile.z, self.source)
-                    let validationOption = MVTPostgis.configuration.validation(tile.z, self.source)
+                    let simplificationOption = self.configuration.simplification(tile.z, self.source)
+                    let clippingOption = self.configuration.clipping(tile.z, self.source)
+                    let validationOption = self.configuration.validation(tile.z, self.source)
                     var columns = layer.fields.keys.map({ "\"\($0)\"" })
                     var useLocalSimplification = false
 
@@ -265,40 +315,43 @@ public final class MVTPostgis: Sendable {
                             projection: self.projection,
                             clipBounds: clipBounds,
                             simplificationTolerance: localSimplificationTolerance,
-                            featureMapping: MVTPostgis.configuration.featureMapping,
+                            featureMapping: self.configuration.featureMapping,
                             batchId: nextBatchId)
                         return (layer.id, layer.datasource.databaseName, features, performanceData)
                     }
                 }
 
                 // Add a timeout for the whole tile/batch
-                group.addTask { [weak self] in
+                let poolDistributor = self.poolDistributor
+                let logger = self.logger
+                let sourceName = source.name
+                let externalName = externalName
+
+                group.addTask {
                     let interval = deadline.timeIntervalSinceNow
                     if interval > 0 {
-                        do {
-                            try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                        }
-                        catch {}
+                        try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                     }
-                    guard Task.isCancelled else {
-                        let timedOutQueries = await self?.poolDistributor
-                            .poolInfos(batchId: nextBatchId)
-                            .flatMap({ pool in
-                                pool.connections.compactMap({ connection -> String? in
-                                    let query = connection.query ?? "<unknown>"
-                                    let runtime = connection.queryRuntime ?? 0.0
-                                    return "Query runtime: \(Int(runtime))s\n\(query)"
-                                })
-                            }) ?? []
+                    guard !Task.isCancelled else {
+                        return ("", "", [], MVTLayerPerformanceData(runtime: 0.0, wkbBytes: 0, features: 0, invalidFeatures: 0, sqlQuery: ""))
+                    }
 
-                        self?.logger.info("\(self?.externalName ?? self?.source.name ?? "n/a"): Batch \(nextBatchId) (\(tile.z)/\(tile.x)/\(tile.y)) timed out after \(MVTPostgis.configuration.tileTimeout) seconds:\n\(timedOutQueries.joined(separator: "\n"))")
-                        throw MVTPostgisError.tileTimedOut(queries: timedOutQueries)
-                    }
-                    return ("", "", [], MVTLayerPerformanceData(runtime: 0.0, wkbBytes: 0, features: 0, invalidFeatures: 0, sqlQuery: ""))
+                    let timedOutQueries = await poolDistributor
+                        .poolInfos(batchId: nextBatchId)
+                        .flatMap({ pool in
+                            pool.connections.compactMap({ connection -> String? in
+                                let query = connection.query ?? "<unknown>"
+                                let runtime = connection.queryRuntime ?? 0.0
+                                return "Query runtime: \(Int(runtime))s\n\(query)"
+                            })
+                        })
+
+                    logger.info("\(externalName ?? sourceName): Batch \(nextBatchId) (\(tile.z)/\(tile.x)/\(tile.y)) timed out after \(self.configuration.tileTimeout) seconds:\n\(timedOutQueries.joined(separator: "\n"))")
+                    throw MVTPostgisError.tileTimedOut(queries: timedOutQueries)
                 }
 
                 var layerIdToRuntimeMapping: [String: MVTLayerPerformanceData]?
-                if MVTPostgis.configuration.trackRuntimes {
+                if self.configuration.trackRuntimes {
                     layerIdToRuntimeMapping = [:]
                 }
 
@@ -308,7 +361,7 @@ public final class MVTPostgis: Sendable {
 
                         tileVar.appendFeatures(features, to: layerId)
 
-                        if MVTPostgis.configuration.trackRuntimes {
+                        if self.configuration.trackRuntimes {
                             layerIdToRuntimeMapping?["\(externalName ?? source.name).\(databaseName).\(layerId)"] = performanceData
                         }
 
@@ -334,7 +387,7 @@ public final class MVTPostgis: Sendable {
     private func queryBounds(
         tile: MapTile,
         tileSize: Int,
-        bufferSize: Int // pixels
+        bufferSize: Int
     ) throws -> BoundingBox {
         var bounds: BoundingBox
 
@@ -346,7 +399,7 @@ public final class MVTPostgis: Sendable {
         case .epsg4326:
             bounds = tile.boundingBox(projection: .epsg4326)
         case .epsg4978:
-            bounds = tile.boundingBox(projection: .epsg4978)
+            bounds = tile.boundingBox(projection: .epsg4978).projected(to: .epsg4326)
         }
 
         if bufferSize != 0 {

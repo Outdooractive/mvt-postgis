@@ -1,7 +1,10 @@
 import Foundation
 import GISTools
 
-/// A Postgis source, from JSON or as parsed from a Mapnik YML or XML file.
+/// A datasource definition parsed from JSON, Mapnik YML, or Mapnik XML.
+///
+/// Contains the source metadata (name, attribution, center, zoom range) and
+/// an array of ``PostgisLayer`` instances, each with its own ``PostgisDatasource``.
 public struct PostgisSource: Codable, Sendable {
 
     /// The source's name.

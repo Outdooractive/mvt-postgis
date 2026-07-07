@@ -1,7 +1,10 @@
 import Foundation
 import GISTools
 
-/// A  datasource, part of Postgis layers.
+/// A PostGIS datasource with connection parameters and SQL query.
+///
+/// Defines how to connect to a PostgreSQL database and what query to execute
+/// to retrieve features. Part of a ``PostgisLayer``.
 public struct PostgisDatasource: Codable, Sendable {
 
     /// The PostgreSQL user.
