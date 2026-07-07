@@ -5,61 +5,55 @@ import Testing
 struct MVTPostgisErrorTests {
 
     @Test
-    func cancelled() throws {
-        let error = MVTPostgisError.cancelled
-        #expect(error != nil)
+    func cancelled() {
+        #expect(MVTPostgisError.cancelled.description == "Cancelled")
     }
 
     @Test
-    func connectionFailed() throws {
-        let error = MVTPostgisError.connectionFailed
-        #expect(error != nil)
+    func connectionFailed() {
+        #expect(MVTPostgisError.connectionFailed.description == "Connection failed")
     }
 
     @Test
-    func needLayers() throws {
-        let error = MVTPostgisError.needLayers
-        #expect(error != nil)
+    func needLayers() {
+        #expect(MVTPostgisError.needLayers.description == "Need layers")
     }
 
     @Test
-    func tileOutOfBounds() throws {
-        let error = MVTPostgisError.tileOutOfBounds
-        #expect(error != nil)
+    func tileOutOfBounds() {
+        #expect(MVTPostgisError.tileOutOfBounds.description == "Tile out of bounds")
     }
 
     @Test
-    func tileTimedOut() throws {
+    func tileTimedOut() {
         let error = MVTPostgisError.tileTimedOut(queries: ["SELECT 1"])
-        #expect(error != nil)
+        #expect(error.description == "Tile timed out:\nQuery #1:\nSELECT 1")
     }
 
     @Test
-    func unsupportedSRID() throws {
-        let error = MVTPostgisError.unsupportedSRID
-        #expect(error != nil)
+    func unsupportedSRID() {
+        #expect(MVTPostgisError.unsupportedSRID.description == "Unsupported SRID")
     }
 
     @Test
-    func unsupportedSRS() throws {
-        let error = MVTPostgisError.unsupportedSRS
-        #expect(error != nil)
+    func unsupportedSRS() {
+        #expect(MVTPostgisError.unsupportedSRS.description == "Unsupported SRS")
     }
 
     @Test
-    func wrongDatasourceType() throws {
+    func wrongDatasourceType() {
         let error = MVTPostgisError.wrongDatasourceType(message: "test")
-        #expect(error != nil)
+        #expect(error.description == "Wrong datasource type: test")
     }
 
     @Test
-    func xmlError() throws {
-        let error = MVTPostgisError.xmlError(message: "test")
-        #expect(error != nil)
+    func xmlError() {
+        let error = MVTPostgisError.xmlError(message: "parse error")
+        #expect(error.description == "XML error: parse error")
     }
 
     @Test
-    func layerWhitelistFiltersJSON() throws {
+    func layerAllowlistFiltersJSON() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -97,11 +91,11 @@ struct MVTPostgisErrorTests {
         """
         let data = try #require(json.data(using: .utf8))
 
-        let all = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let all = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(all.layers.count == 2)
 
-        let filtered = try PostgisSource.load(from: data, layerWhitelist: ["roads"])
-        #expect(filtered.layers.count == 2)
+        let filtered = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
+        #expect(filtered.layers.count == 1)
     }
 
 }

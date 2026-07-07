@@ -27,30 +27,63 @@ public struct PostgisSource: Codable, Sendable {
     /// The source's layers with the Postgis configuration and SQL.
     public let layers: [PostgisLayer]
 
+    init(name: String,
+         description: String,
+         attribution: String,
+         center: Coordinate3D,
+         defaultZoom: Int,
+         minZoom: Int,
+         maxZoom: Int,
+         layers: [PostgisLayer]
+    ) {
+        self.name = name
+        self.description = description
+        self.attribution = attribution
+        self.center = center
+        self.defaultZoom = defaultZoom
+        self.minZoom = minZoom
+        self.maxZoom = maxZoom
+        self.layers = layers
+    }
+
     // MARK: -
 
     /// Load a source from an URL, can either be JSON, or Mapnik YML or XML.
     public static func load(
         from url: URL,
-        layerWhitelist: [String]?
+        layerAllowlist: [String]?
     ) throws -> PostgisSource {
         let data = try Data(contentsOf: url)
-        return try load(from: data, layerWhitelist: layerWhitelist)
+        return try load(from: data, layerAllowlist: layerAllowlist)
     }
 
     /// Load a source from a Data object, can either be JSON, or Mapnik YML or XML.
     public static func load(
         from data: Data,
-        layerWhitelist: [String]?
+        layerAllowlist: [String]?
     ) throws -> PostgisSource {
         if data.starts(with: [0x7B]) {
-            return try JSONDecoder().decode(PostgisSource.self, from: data)
+            let source = try JSONDecoder().decode(PostgisSource.self, from: data)
+
+            guard let layerAllowlist,
+                  layerAllowlist.isNotEmpty
+            else { return source }
+
+            return PostgisSource(
+                name: source.name,
+                description: source.description,
+                attribution: source.attribution,
+                center: source.center,
+                defaultZoom: source.defaultZoom,
+                minZoom: source.minZoom,
+                maxZoom: source.maxZoom,
+                layers: source.layers.filter { layerAllowlist.contains($0.id) })
         }
         else if data.starts(with: [0x3C, 0x3F, 0x78, 0x6D, 0x6C, 0x20]) {
-            return try MapnikXMLSource.load(from: data, layerAllowlist: layerWhitelist ?? [])
+            return try MapnikXMLSource.load(from: data, layerAllowlist: layerAllowlist ?? [])
         }
         else {
-            return try MapnikYMLSource.load(from: data, layerAllowlist: layerWhitelist ?? [])
+            return try MapnikYMLSource.load(from: data, layerAllowlist: layerAllowlist ?? [])
         }
     }
 

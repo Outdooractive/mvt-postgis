@@ -44,7 +44,7 @@ struct YMLSourceTests {
     @Test
     func YMLSource() throws {
         let data = try #require(YMLSourceTests.ymlSource.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
 
         #expect(source.name == "Test Source")
         #expect(source.description == "A test source for testing")

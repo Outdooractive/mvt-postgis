@@ -34,7 +34,7 @@ struct SourceParsingEdgeCaseTests {
         }
         """
         let data = try #require(json.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(source.layers.count == 1)
         #expect(source.layers.first?.description == nil)
         #expect(source.layers.first?.datasource.boundingBox == nil)
@@ -68,7 +68,7 @@ struct SourceParsingEdgeCaseTests {
         }
         """
         let data = try #require(json.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(source.layers.first?.datasource.srid == .epsg3857)
     }
 
@@ -100,7 +100,7 @@ struct SourceParsingEdgeCaseTests {
         }
         """
         let data = try #require(json.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         let bbox = try #require(source.layers.first?.datasource.boundingBox)
         #expect(bbox.southWest.latitude == -10.0)
         #expect(bbox.southWest.longitude == -10.0)
@@ -138,7 +138,7 @@ struct SourceParsingEdgeCaseTests {
             table: (SELECT * FROM t) AS data
         """
         let data = try #require(yml.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(source.layers.first?.datasource.srid == .epsg3857)
     }
 
@@ -186,7 +186,7 @@ struct SourceParsingEdgeCaseTests {
             table: (SELECT * FROM buildings) AS data
         """
         let data = try #require(yml.data(using: .utf8))
-        let allowlisted = try PostgisSource.load(from: data, layerWhitelist: ["roads"])
+        let allowlisted = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
         #expect(allowlisted.layers.count == 1)
         #expect(allowlisted.layers.first?.id == "roads")
     }
@@ -223,7 +223,7 @@ struct SourceParsingEdgeCaseTests {
         </Map>
         """
         let data = try #require(xml.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(source.layers.count == 1)
         #expect(source.layers.first?.datasource.boundingBox == nil)
     }
@@ -269,7 +269,7 @@ struct SourceParsingEdgeCaseTests {
         </Map>
         """
         let data = try #require(xml.data(using: .utf8))
-        let allowlisted = try PostgisSource.load(from: data, layerWhitelist: ["roads"])
+        let allowlisted = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
         #expect(allowlisted.layers.count == 1)
         #expect(allowlisted.layers.first?.id == "roads")
     }
@@ -280,7 +280,7 @@ struct SourceParsingEdgeCaseTests {
     func invalidJSONThrows() throws {
         let data = try #require("{invalid json".data(using: .utf8))
         #expect(throws: Error.self) {
-            try PostgisSource.load(from: data, layerWhitelist: nil)
+            try PostgisSource.load(from: data, layerAllowlist: nil)
         }
     }
 
@@ -294,12 +294,12 @@ struct SourceParsingEdgeCaseTests {
         """
         let data = try #require(xml.data(using: .utf8))
         #expect(throws: Error.self) {
-            try PostgisSource.load(from: data, layerWhitelist: nil)
+            try PostgisSource.load(from: data, layerAllowlist: nil)
         }
     }
 
     @Test
-    func layerWhitelistFiltersJSON() throws {
+    func layerAllowlistFiltersJSON() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -337,14 +337,11 @@ struct SourceParsingEdgeCaseTests {
         """
         let data = try #require(json.data(using: .utf8))
 
-        let all = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let all = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(all.layers.count == 2)
 
-        // JSON sources don't support whitelist filtering — the whitelist
-        // is only applied to YML and XML sources during parsing.
-        // Source-level filtering must be done by the caller via source.filter.
-        let filtered = try PostgisSource.load(from: data, layerWhitelist: ["roads"])
-        #expect(filtered.layers.count == 2)
+        let filtered = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
+        #expect(filtered.layers.count == 1)
     }
 
 }

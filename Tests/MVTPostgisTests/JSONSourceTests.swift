@@ -53,7 +53,7 @@ struct JSONSourceTests {
     @Test
     func JSONSource() async throws {
         let data = try #require(JSONSourceTests.jsonSource.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
 
         #expect(source.name == "Test Source")
         #expect(source.description == "A test source for testing")
@@ -120,7 +120,7 @@ struct JSONSourceTests {
         }
         """
         let data = try #require(json.data(using: .utf8))
-        let source = try PostgisSource.load(from: data, layerWhitelist: nil)
+        let source = try PostgisSource.load(from: data, layerAllowlist: nil)
         #expect(source.layers.count == 1)
         #expect(source.layers.first?.datasource.boundingBox == nil)
         #expect(source.layers.first?.datasource.geometryField == nil)

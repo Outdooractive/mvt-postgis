@@ -2,7 +2,7 @@ import Foundation
 import PostgresNIO
 
 /// Possible errors thrown from the *MVTPostgis* library.
-public enum MVTPostgisError: Error {
+public enum MVTPostgisError: Error, Equatable, Sendable {
 
     /// The request was cancelled.
     case cancelled
@@ -22,5 +22,37 @@ public enum MVTPostgisError: Error {
     case wrongDatasourceType(message: String)
     /// XML parsing error, see `message` for more details.
     case xmlError(message: String)
+
+}
+
+// MARK: - CustomStringConvertible
+
+extension MVTPostgisError: CustomStringConvertible {
+
+    public var description: String {
+        switch self {
+        case .cancelled:
+            return "Cancelled"
+        case .connectionFailed:
+            return "Connection failed"
+        case .needLayers:
+            return "Need layers"
+        case .tileOutOfBounds:
+            return "Tile out of bounds"
+        case .tileTimedOut(let queries):
+            let queryLines = queries.enumerated().map { index, query in
+                "Query #\(index + 1):\n\(query)"
+            }
+            return "Tile timed out:\n\(queryLines.joined(separator: "\n"))"
+        case .unsupportedSRID:
+            return "Unsupported SRID"
+        case .unsupportedSRS:
+            return "Unsupported SRS"
+        case .wrongDatasourceType(let message):
+            return "Wrong datasource type: \(message)"
+        case .xmlError(let message):
+            return "XML error: \(message)"
+        }
+    }
 
 }

@@ -55,18 +55,18 @@ public final class MVTPostgis: Sendable {
     /// - Parameters:
     ///   - sourceURL: The file URL of the datasource definition.
     ///   - externalName: An optional name used in runtime tracking and log messages.
-    ///   - layerWhitelist: Optional list of layer names to include. When `nil`, all layers are included.
+    ///   - layerAllowlist: Optional list of layer names to include. When `nil`, all layers are included.
     ///   - logger: An optional logger. If `nil`, a default logger is created.
     /// - Throws: ``MVTPostgisError`` or decoding errors from the source file.
     public convenience init(
         sourceURL: URL,
         externalName: String? = nil,
-        layerWhitelist: [String]? = nil,
+        layerAllowlist: [String]? = nil,
         logger: Logger? = nil
     ) throws {
         let source = try PostgisSource.load(
             from: sourceURL,
-            layerWhitelist: layerWhitelist)
+            layerAllowlist: layerAllowlist)
 
         try self.init(
             source: source,
@@ -81,18 +81,18 @@ public final class MVTPostgis: Sendable {
     /// - Parameters:
     ///   - sourceData: The datasource definition as raw data.
     ///   - externalName: An optional name used in runtime tracking and log messages.
-    ///   - layerWhitelist: Optional list of layer names to include. When `nil`, all layers are included.
+    ///   - layerAllowlist: Optional list of layer names to include. When `nil`, all layers are included.
     ///   - logger: An optional logger. If `nil`, a default logger is created.
     /// - Throws: ``MVTPostgisError`` or decoding errors from the source data.
     public convenience init(
         sourceData: Data,
         externalName: String? = nil,
-        layerWhitelist: [String]? = nil,
+        layerAllowlist: [String]? = nil,
         logger: Logger? = nil
     ) throws {
         let source = try PostgisSource.load(
             from: sourceData,
-            layerWhitelist: layerWhitelist)
+            layerAllowlist: layerAllowlist)
 
         try self.init(
             source: source,
