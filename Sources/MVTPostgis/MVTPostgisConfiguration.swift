@@ -1,17 +1,9 @@
 import Foundation
 import GISTools
 
-/// The output format for tile encoding.
-public enum TileOutputFormat: String, Sendable, CaseIterable {
-
-    /// Mapbox Vector Tile (MVT) — the standard vector tile format.
-    case mvt
-    /// MapLibre Tile (MLT) — the MapLibre vector tile format.
-    case mlt
-
-}
-
-/// Global configuration for the MVT Postgis adapter.
+/// Global configuration for ``MVTPostgis`` instances.
+///
+/// Set on ``MVTPostgis/configuration`` before creating any instances.
 public struct MVTPostgisConfiguration: Sendable {
 
     /// The name used for database connections and the default logger (default: 'MVTPostgis').
@@ -48,6 +40,22 @@ public struct MVTPostgisConfiguration: Sendable {
     /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
 
+    /// Creates a configuration with the given settings.
+    ///
+    /// All timeouts and pool sizes are clamped to sensible minimum values.
+    ///
+    /// - Parameters:
+    ///   - applicationName: The name used for database connections and the default logger.
+    ///   - connectTimeout: Timeout for opening new database connections (seconds, minimum 1).
+    ///   - queryTimeout: Timeout for individual database queries (seconds, minimum 1). Set to `nil` to disable.
+    ///   - tileTimeout: Timeout for one complete tile (seconds, minimum 1).
+    ///   - poolSize: Number of connections per database pool (minimum 1).
+    ///   - maxIdleConnections: Maximum idle connections over a 60-second period. `nil` means no limit.
+    ///   - clipping: Closure returning the clipping strategy per zoom level.
+    ///   - simplification: Closure returning the simplification strategy per zoom level.
+    ///   - validation: Closure returning the geometry validation strategy per zoom level.
+    ///   - featureMapping: Optional closure to transform features after creation.
+    ///   - trackRuntimes: When `true`, per-layer query runtimes are tracked and returned with each tile.
     public init(
         applicationName: String = "MVTPostgis",
         connectTimeout: TimeInterval = 5.0,

@@ -1,7 +1,10 @@
 import Foundation
 import GISTools
 
-/// A  Layer, part of a Postgis source.
+/// A vector tile layer backed by a PostGIS datasource.
+///
+/// Defines the layer name, fields, tile buffer size, and the associated
+/// ``PostgisDatasource`` with connection parameters and SQL query.
 public struct PostgisLayer: Codable, Sendable {
 
     /// Some layer properties.

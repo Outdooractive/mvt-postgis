@@ -1,6 +1,6 @@
 import Foundation
 
-/// Some statistics about query performance of one (Postgis) layer.
+/// Statistics about the performance of a single PostGIS layer query.
 public struct MVTLayerPerformanceData: Sendable {
 
     /// The total query runtime (Postgis + parsing).
@@ -14,6 +14,13 @@ public struct MVTLayerPerformanceData: Sendable {
     /// The SQL query used.
     public let sqlQuery: String
 
+    /// Creates a performance data record.
+    /// - Parameters:
+    ///   - runtime: The total query runtime in seconds (PostGIS + parsing).
+    ///   - wkbBytes: The total WKB geometry bytes received from the database.
+    ///   - features: The number of features returned.
+    ///   - invalidFeatures: The number of features that could not be parsed.
+    ///   - sqlQuery: The SQL query that was executed.
     public init(
         runtime: TimeInterval,
         wkbBytes: Int64,
