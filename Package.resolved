@@ -1,5 +1,5 @@
 {
-  "originHash" : "d9648cb47e2032aa4a767bb813fee6e809d1fded29e9e28501cc4c73b8934f1f",
+  "originHash" : "189c599ec9a68a99dc1056ac3e06b5c4a45d8e384429c14666357806dec16833",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/mvt-tools",
       "state" : {
-        "revision" : "886839a23b70bf03fb5a231b4ad4384829c66f7c",
-        "version" : "2.2.4"
+        "revision" : "e20ad2952f187cd4dfe93f2c5d07e2806272185f",
+        "version" : "2.2.5"
       }
     },
     {
