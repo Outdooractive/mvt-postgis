@@ -1,5 +1,5 @@
 {
-  "originHash" : "60a4f70bcb9459b5d2f3d3813943e0d0d722b3edefd136c644c4050b2cac7c47",
+  "originHash" : "d9648cb47e2032aa4a767bb813fee6e809d1fded29e9e28501cc4c73b8934f1f",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/gis-tools",
       "state" : {
-        "revision" : "93e41e54a3703ebeeac5dff3f909c36d0fbd853c",
-        "version" : "2.0.6"
+        "revision" : "5a8121e6d51d6ed990b5f66f6c96a538215821e5",
+        "version" : "2.0.7"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/mvt-tools",
       "state" : {
-        "revision" : "7957420169d527de0fee882e618624dc8e36d469",
-        "version" : "2.0.1"
+        "revision" : "886839a23b70bf03fb5a231b4ad4384829c66f7c",
+        "version" : "2.2.4"
       }
     },
     {
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/postgres-kit",
       "state" : {
-        "revision" : "7c079553e9cda74811e627775bf22e40a9405ad9",
-        "version" : "2.15.1"
+        "revision" : "218aaf6810db9e61398f887aaaf26424142bdb53",
+        "version" : "2.16.1"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/postgres-nio.git",
       "state" : {
-        "revision" : "f2188e05ba3546a76e61a5193c071b82c4d69a45",
-        "version" : "1.33.0"
+        "revision" : "39ce38a93408937bcd27f521f3cdf88266136b80",
+        "version" : "1.33.1"
       }
     },
     {
@@ -159,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "1b6b2e274e85105bfa155183145a1dcfd63331f1",
-        "version" : "4.5.0"
+        "revision" : "47d3869a7291f085c1fb9fb1e6d3b97a793f45c6",
+        "version" : "4.5.1"
       }
     },
     {
@@ -240,8 +240,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "b5544ba79a70a0cb3563e75bf26dc198d6b40ed3",
-        "version" : "1.7.4"
+        "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
+        "version" : "1.7.5"
       }
     },
     {
