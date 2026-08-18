@@ -269,12 +269,20 @@ public final class MVTPostgis: Sendable {
                     case .local: useLocalSimplification = true
                     default: break
                     }
-                    if clippingOption == .postgis {
+                    switch clippingOption {
+                    case .postgis:
                         postgisGeometryColumn.append("ST_ClipByBox2D(")
+                    case .postgisIntersection:
+                        postgisGeometryColumn.append("ST_Intersection(")
+                    case .none, .local:
+                        break
                     }
                     postgisGeometryColumn.append("\"\(geometryField)\"")
-                    if clippingOption == .postgis {
+                    switch clippingOption {
+                    case .postgis, .postgisIntersection:
                         postgisGeometryColumn.append(",\(envelope))")
+                    case .none, .local:
+                        break
                     }
                     if case let .postgis(preserveCollapsed) = simplificationOption {
                         postgisGeometryColumn.append(",\(simplificationTolerance)")

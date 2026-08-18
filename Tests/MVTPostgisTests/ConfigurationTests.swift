@@ -58,6 +58,7 @@ struct MVTPostgisConfigurationTests {
     func clippingOptionAllCases() {
         let _: MVTClippingOption = .none
         let _: MVTClippingOption = .postgis
+        let _: MVTClippingOption = .postgisIntersection
         let _: MVTClippingOption = .local
     }
 

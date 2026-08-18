@@ -94,7 +94,20 @@ public enum MVTClippingOption: Sendable {
     /// Note: Might lead to memory explosion.
     case none
     /// Do the clipping in Postgis with `ST_ClipByBox2D`.
+    ///
+    /// `ST_ClipByBox2D` is fast but does not preserve polygon topology: it can
+    /// produce MultiPolygons where interior rings (holes) are stored as
+    /// separate polygons, and degenerate zero-area rings at the clip boundary.
+    /// The MLT encoder compensates for this by re-grouping rings via winding
+    /// order, but the raw geometry from the database is not clean.
     case postgis
+    /// Do the clipping in Postgis with `ST_Intersection`.
+    ///
+    /// `ST_Intersection` is slower than `ST_ClipByBox2D` but preserves polygon
+    /// topology: interior rings (holes) remain associated with their parent
+    /// exterior rings, and no degenerate rings are produced.  This is the
+    /// recommended option when serving MLT tiles.
+    case postgisIntersection
     /// Do the clipping locally, before adding features to the vector tile.
     case local
 
