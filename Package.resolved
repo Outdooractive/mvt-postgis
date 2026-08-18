@@ -1,5 +1,5 @@
 {
-  "originHash" : "3e695dbf9a53fe6a1054c58e7cf3a4700d6c1b6f0bcc0786f98b736797cf4168",
+  "originHash" : "8e21f67436881ee9a17faa8914644ca0cdba18602506e0b50607f9d2827d3cb9",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/gis-tools",
       "state" : {
-        "revision" : "15aac3d2565498ef5555010a8528c8e95a626f09",
-        "version" : "2.2.1"
+        "revision" : "fca8d024822d6c12091d6663d90ca1e1ecb77494",
+        "version" : "2.3.0"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/gis-tools-fit",
       "state" : {
-        "revision" : "8a1de49b100bf264a9541d2732e8baa261ff6563",
-        "version" : "1.1.2"
+        "revision" : "a44052703ba73c2b809296939b5ffbc7e3410b76",
+        "version" : "1.1.4"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/gis-tools-gpx",
       "state" : {
-        "revision" : "98f9de2a287eed28b179dc19e1a5165611f705a8",
-        "version" : "1.0.4"
+        "revision" : "456ff30d8a61c1e093cb1aaf54242625bc92a5be",
+        "version" : "1.0.5"
       }
     },
     {
@@ -177,8 +177,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "a878e7f8f46cfc0e1125e565b5c08e7d5272dc9a",
-        "version" : "1.14.0"
+        "revision" : "3ffafb9722d5d918c614feb496c8789a3b59d222",
+        "version" : "1.15.0"
       }
     },
     {
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
-        "version" : "1.7.5"
+        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
+        "version" : "1.8.1"
       }
     },
     {

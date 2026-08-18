@@ -12,7 +12,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Outdooractive/mvt-tools", from: "2.3.1"),
-        .package(url: "https://github.com/Outdooractive/gis-tools", from: "2.2.1"),
+        .package(url: "https://github.com/Outdooractive/gis-tools", from: "2.3.0"),
         .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "1.0.0"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.1"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.6.0"),
