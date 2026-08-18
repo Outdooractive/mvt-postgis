@@ -1,5 +1,5 @@
 {
-  "originHash" : "8e21f67436881ee9a17faa8914644ca0cdba18602506e0b50607f9d2827d3cb9",
+  "originHash" : "90563d0be988d64d4e955f1c07e4b07ea68171902a0f8faf01e3e4a82a14498d",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "fca8d024822d6c12091d6663d90ca1e1ecb77494",
         "version" : "2.3.0"
+      }
+    },
+    {
+      "identity" : "gis-tools-csv",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Outdooractive/gis-tools-csv",
+      "state" : {
+        "revision" : "6a707262de28c768f15d805ee59e65fa3f12aca5",
+        "version" : "1.1.0"
       }
     },
     {
@@ -69,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/mvt-tools",
       "state" : {
-        "revision" : "da15e10cfcbed1f4b337dc1c34ad3a7388629861",
-        "version" : "2.3.1"
+        "revision" : "7c9ce2125e13072a4998a4ea8c3d0a060e0650a4",
+        "version" : "2.4.2"
       }
     },
     {

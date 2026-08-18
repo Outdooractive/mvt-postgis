@@ -214,9 +214,7 @@ public final class MVTPostgis: Sendable {
             of: (String, String, [Feature], MVTLayerPerformanceData).self,
             body: { group -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) in
                 // Note: Geometries loaded from WKB will always be projected to EPSG:4326
-                guard var tileVar = VectorTile(tile: tile, projection: projection) else {
-                    throw MVTPostgisError.tileOutOfBounds
-                }
+                var tileVar = try VectorTile(tile: tile, projection: projection)
 
                 // https://github.com/mapnik/mapnik/blob/master/src/scale_denominator.cpp
                 // https://github.com/openstreetmap/mapnik-stylesheets/blob/master/zoom-to-scale.txt
