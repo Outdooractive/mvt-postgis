@@ -36,7 +36,10 @@ let package = Package(
             ]),
         .testTarget(
             name: "MVTPostgisTests",
-            dependencies: ["MVTPostgis"],
+            dependencies: [
+                "MVTPostgis",
+                .product(name: "PostgresConnectionPool", package: "PostgresConnectionPool"),
+            ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
             ])

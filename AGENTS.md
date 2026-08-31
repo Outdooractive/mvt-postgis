@@ -24,7 +24,15 @@ Key source areas:
 - **`Postgis/Mapnik/MapnikYMLSource.swift`** — YML source parser (Mapnik `datasource` format).
 - **`Postgis/Mapnik/MapnikXMLSource.swift`** — XML source parser (Mapnik/Mapbox Studio format).
 - **`Pool/PoolDistributor.swift`** — Connection pool distributor: manages per-database `PostgresConnectionPool` instances,
-  assigns connections to layers respecting batch limits.
+  assigns connections to layers respecting batch limits. Recreates pools that shut themselves down
+  (`PostgresConnectionPool` treats connection errors during a database outage as fatal and never
+  recovers on its own), so consumers survive PostGIS restarts without a process restart.
+  Recreation is strictly gated: while a shut-down pool exists, a cheap TCP reachability probe
+  gates any recreation (a probe costs one socket; every pool owns an event loop group with one
+  fd per thread, so recreating blind per request during an outage exhausts the process file
+  descriptors — this also guards the actor-reentrancy race where parallel requests could each
+  recreate). Fail-fast against the dead pool until the probe succeeds; at most one recreated
+  pool per outage.
 - **`MVTLayerPerformanceData.swift`** — Per-layer runtime statistics: query time, WKB bytes, feature count, invalid feature count.
 - **`MVTPostgisError.swift`** — Error types: connection failures, invalid sources, tile bounds, cancellation.
 - **`Extensions/`** — Thread-safe collectors (`ThreadSafeArrayCollector`, `ThreadSafeObjectCollector`), task extensions,

@@ -27,7 +27,7 @@ public struct PostgisSource: Codable, Sendable {
     /// The source's layers with the Postgis configuration and SQL.
     public let layers: [PostgisLayer]
 
-    init(name: String,
+    public init(name: String,
          description: String,
          attribution: String,
          center: Coordinate3D,

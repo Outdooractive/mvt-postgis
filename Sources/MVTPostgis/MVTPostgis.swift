@@ -168,6 +168,55 @@ public final class MVTPostgis: Sendable {
         await poolDistributor.poolInfos()
     }
 
+    // MARK: - SQL Validation
+
+    /// Validates the SQL query for a layer by running `EXPLAIN` against the
+    /// layer's database.
+    ///
+    /// This reuses the existing connection pool (read-only sessions) — no
+    /// separate Postgres client is needed. The mapnik placeholders `!bbox!`,
+    /// `!scale_denominator!`, and `!pixel_width!` are replaced with dummy
+    /// values so the query can be parsed and planned without a real tile
+    /// bounding box.
+    ///
+    /// - Parameters:
+    ///   - sql: The SQL query (with `!bbox!` etc. tokens) to validate.
+    ///   - layer: The layer whose datasource provides the connection
+    ///     parameters. The layer must already be part of this source (or at
+    ///     least have matching connection params).
+    /// - Returns: `nil` if the query is valid, or the full error message
+    ///   (via `String(reflecting:)`) if the query fails — syntax error,
+    ///   missing table/column, connection failure, etc.
+    public func validate(
+        sql: String,
+        forLayer layer: PostgisLayer
+    ) async -> String? {
+
+        let preparedSQL = sql
+            .replacingOccurrences(of: "!bbox!", with: "ST_MakeEnvelope(0, 0, 1, 1, 3857)")
+            .replacingOccurrences(of: "!scale_denominator!", with: "1000")
+            .replacingOccurrences(of: "!pixel_width!", with: "1")
+        let explainSQL = "EXPLAIN \(preparedSQL)"
+        let batchId = MVTPostgis.batchId.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
+
+        do {
+            try await poolDistributor.connection(
+                forLayer: layer,
+                batchId: batchId,
+                callback: { connection in
+                    let rows = try await connection.query(
+                        PostgresQuery(unsafeSQL: explainSQL),
+                        logger: self.logger)
+                    // Drain the row sequence — we only care that it doesn't throw.
+                    for try await _ in rows {}
+                })
+            return nil
+        }
+        catch {
+            return String(reflecting: error)
+        }
+    }
+
     // MARK: -
 
     /// Return tile data at the given z/x/y coordinate in the specified format.
