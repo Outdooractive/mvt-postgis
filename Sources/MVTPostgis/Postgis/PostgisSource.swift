@@ -106,4 +106,35 @@ public struct PostgisSource: Codable, Sendable {
         }
     }
 
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case name, description, attribution, center, defaultZoom, minZoom, maxZoom, layers
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.description = try container.decode(String.self, forKey: .description)
+        self.attribution = try container.decode(String.self, forKey: .attribution)
+        self.center = try container.decode(Coordinate3D.self, forKey: .center)
+        self.defaultZoom = try container.decode(Int.self, forKey: .defaultZoom)
+        self.minZoom = try container.decode(Int.self, forKey: .minZoom)
+        self.maxZoom = try container.decode(Int.self, forKey: .maxZoom)
+        self.layers = try container.decode([PostgisLayer].self, forKey: .layers)
+        self.origin = .json
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(description, forKey: .description)
+        try container.encode(attribution, forKey: .attribution)
+        try container.encode(center, forKey: .center)
+        try container.encode(defaultZoom, forKey: .defaultZoom)
+        try container.encode(minZoom, forKey: .minZoom)
+        try container.encode(maxZoom, forKey: .maxZoom)
+        try container.encode(layers, forKey: .layers)
+    }
+
 }
