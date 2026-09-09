@@ -186,7 +186,8 @@ struct MapnikXMLSource {
             defaultZoom: defaultZoom,
             minZoom: minZoom,
             maxZoom: maxZoom,
-            layers: layers)
+            layers: layers,
+            origin: .xml)
 
         return source
     }

@@ -7,6 +7,18 @@ import GISTools
 /// an array of ``PostgisLayer`` instances, each with its own ``PostgisDatasource``.
 public struct PostgisSource: Codable, Sendable {
 
+    /// The file format the source was parsed from.
+    public enum Origin: String, Codable, Sendable {
+
+        /// JSON.
+        case json
+        /// Mapnik YML.
+        case yml
+        /// Mapnik XML.
+        case xml
+
+    }
+
     /// The source's name.
     public let name: String
     /// The source's description.
@@ -27,6 +39,9 @@ public struct PostgisSource: Codable, Sendable {
     /// The source's layers with the Postgis configuration and SQL.
     public let layers: [PostgisLayer]
 
+    /// The file format this source was parsed from.
+    public private(set) var origin: Origin
+
     public init(name: String,
          description: String,
          attribution: String,
@@ -34,7 +49,8 @@ public struct PostgisSource: Codable, Sendable {
          defaultZoom: Int,
          minZoom: Int,
          maxZoom: Int,
-         layers: [PostgisLayer]
+         layers: [PostgisLayer],
+         origin: Origin = .json
     ) {
         self.name = name
         self.description = description
@@ -44,6 +60,7 @@ public struct PostgisSource: Codable, Sendable {
         self.minZoom = minZoom
         self.maxZoom = maxZoom
         self.layers = layers
+        self.origin = origin
     }
 
     // MARK: -
@@ -63,7 +80,8 @@ public struct PostgisSource: Codable, Sendable {
         layerAllowlist: [String]?
     ) throws -> PostgisSource {
         if data.starts(with: [0x7B]) {
-            let source = try JSONDecoder().decode(PostgisSource.self, from: data)
+            var source = try JSONDecoder().decode(PostgisSource.self, from: data)
+            source.origin = .json
 
             guard let layerAllowlist,
                   layerAllowlist.isNotEmpty
@@ -77,7 +95,8 @@ public struct PostgisSource: Codable, Sendable {
                 defaultZoom: source.defaultZoom,
                 minZoom: source.minZoom,
                 maxZoom: source.maxZoom,
-                layers: source.layers.filter { layerAllowlist.contains($0.id) })
+                layers: source.layers.filter { layerAllowlist.contains($0.id) },
+                origin: .json)
         }
         else if data.starts(with: [0x3C, 0x3F, 0x78, 0x6D, 0x6C, 0x20]) {
             return try MapnikXMLSource.load(from: data, layerAllowlist: layerAllowlist ?? [])

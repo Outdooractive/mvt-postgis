@@ -33,7 +33,8 @@ struct MapnikYMLSource: Decodable {
             defaultZoom: ymlSource.defaultZoom,
             minZoom: ymlSource.minZoom,
             maxZoom: ymlSource.maxZoom,
-            layers: ymlLayers)
+            layers: ymlLayers,
+            origin:  .yml)
     }
 
     // MARK: - Private
