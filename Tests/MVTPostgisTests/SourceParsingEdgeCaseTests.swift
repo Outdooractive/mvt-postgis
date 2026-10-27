@@ -8,7 +8,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - JSON edge cases
 
     @Test
-    func jsonWithoutOptionalFields() throws {
+    func `json without optional fields`() throws {
         let json = """
         {
           "name": "Minimal",
@@ -42,7 +42,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func jsonWith3857Projection() throws {
+    func `json with 3857 projection`() throws {
         let json = """
         {
           "name": "3857 Source",
@@ -73,7 +73,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func jsonBoundinBoxParsing() throws {
+    func `json boundin box parsing`() throws {
         let json = """
         {
           "name": "BBox",
@@ -111,7 +111,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - YML edge cases
 
     @Test
-    func ymlWith3857Projection() throws {
+    func `yml with 3857 projection`() throws {
         let yml = """
         name: Test
         description: ""
@@ -143,7 +143,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func ymlWithLayerAllowlist() throws {
+    func `yml with layer allowlist`() throws {
         let yml = """
         name: Test
         description: ""
@@ -194,7 +194,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - XML edge cases
 
     @Test
-    func xmlWithExtentButNoBoundingBox() throws {
+    func `xml with extent but no bounding box`() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -229,7 +229,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func xmlWithLayerAllowlist() throws {
+    func `xml with layer allowlist`() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -277,7 +277,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - Error handling
 
     @Test
-    func invalidJSONThrows() throws {
+    func `invalid JSON throws`() throws {
         let data = try #require("{invalid json".data(using: .utf8))
         #expect(throws: Error.self) {
             try PostgisSource.load(from: data, layerAllowlist: nil)
@@ -285,7 +285,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func xmlWithoutLayerThrows() throws {
+    func `xml without layer throws`() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -299,7 +299,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func layerAllowlistFiltersJSON() throws {
+    func `layer allowlist filters JSON`() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -342,6 +342,52 @@ struct SourceParsingEdgeCaseTests {
 
         let filtered = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
         #expect(filtered.layers.count == 1)
+    }
+
+}
+
+// MARK: - Explicit XML errors
+
+struct XMLSourceErrorTests {
+
+    @Test
+    func `missing datasource throws`() throws {
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <Map srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">
+        <Parameters>
+        <Parameter name="name">Broken</Parameter>
+        </Parameters>
+        <Layer name="roads" srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">
+        <StyleName>roads</StyleName>
+        </Layer>
+        </Map>
+        """
+        let data = try #require(xml.data(using: .utf8))
+        #expect(throws: MVTPostgisError.xmlError(message: "Layer 'roads' is missing a Datasource")) {
+            try PostgisSource.load(from: data, layerAllowlist: nil)
+        }
+    }
+
+    @Test
+    func `incomplete datasource throws`() throws {
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <Map srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">
+        <Parameters>
+        <Parameter name="name">Broken</Parameter>
+        </Parameters>
+        <Layer name="roads" srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">
+        <Datasource>
+        <Parameter name="user">u</Parameter>
+        </Datasource>
+        </Layer>
+        </Map>
+        """
+        let data = try #require(xml.data(using: .utf8))
+        #expect(throws: MVTPostgisError.xmlError(message: "Layer 'roads' has incomplete datasource parameters")) {
+            try PostgisSource.load(from: data, layerAllowlist: nil)
+        }
     }
 
 }

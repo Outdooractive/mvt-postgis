@@ -3,11 +3,11 @@ import GISTools
 import SwiftyXMLParser
 
 /// Loads the Postgis configuration from a Mapnik XML source file.
-struct MapnikXMLSource {
+enum MapnikXMLSource {
 
     static func load(
         from url: URL,
-        layerAllowlist: [String]
+        layerAllowlist: [String],
     ) throws -> PostgisSource {
         let data = try Data(contentsOf: url)
         return try load(from: data, layerAllowlist: layerAllowlist)
@@ -15,7 +15,7 @@ struct MapnikXMLSource {
 
     static func load(
         from data: Data,
-        layerAllowlist: [String]
+        layerAllowlist: [String],
     ) throws -> PostgisSource {
         let xmlParser = XML.parse(data)
 
@@ -31,6 +31,8 @@ struct MapnikXMLSource {
 
         var layers: [PostgisLayer] = []
 
+        let mapSRS = xmlParser.Map.attributes["srs"] ?? ""
+
         xmlParser.Map.Parameters.Parameter.all?.forEach({ element in
             guard let nameAttribute = element.attributes["name"],
                   let value = element.text ?? element.CDATA?.asUTF8EncodedString
@@ -39,51 +41,55 @@ struct MapnikXMLSource {
             switch nameAttribute {
             case "name":
                 name = value
+
             case "description":
                 description = value
+
             case "attribution":
                 attribution = value
+
             case "minzoom":
                 minZoom = Int(value) ?? 0
+
             case "maxzoom":
                 maxZoom = Int(value) ?? 20
+
             case "json":
                 layerFields = MapnikXMLSource.parseFields(from: value)
                 layerDescriptions = MapnikXMLSource.parseDescriptions(from: value)
+
             case "center":
                 let components = value.split(separator: ",").compactMap({ Double($0) })
                 guard components.count == 3 else { return }
+
                 center = Coordinate3D(latitude: components[1], longitude: components[0])
                 defaultZoom = Int(components[2])
-            default: 
+
+            default:
                 return
             }
         })
 
-        guard name.isNotEmpty, layerFields.isNotEmpty else {
-            throw MVTPostgisError.xmlError(message: "Missing 'name' or 'json' parameter")
+        guard name.isNotEmpty else {
+            throw MVTPostgisError.xmlError(message: "Missing 'name' parameter")
         }
 
-        xmlParser.Map.Layer.all?.forEach({ element in
-            guard let name = element.attributes["name"],
-                  let srs = element.attributes["srs"],
-                  let bufferSize = element.attributes["buffer-size"]?.toInt
-            else {
-                print("Missing attributes for Layer \(element.attributes)")
-                return
+        for element in xmlParser.Map.Layer.all ?? [] {
+            guard let name = element.attributes["name"] else {
+                throw MVTPostgisError.xmlError(message: "Layer without a name")
             }
 
             if layerAllowlist.isNotEmpty,
-               !layerAllowlist.contains(name)
+               layerAllowlist.contains(name) == false
             {
-                return
+                continue
             }
 
-            guard let datasourceElement = element.childElements.first,
-                  datasourceElement.name == "Datasource"
-            else {
-                print("Missing Datasource for Layer \(name)")
-                return
+            let srs = element.attributes["srs"] ?? mapSRS
+            let bufferSize = element.attributes["buffer-size"]?.toInt ?? 0
+
+            guard let datasourceElement = element.childElements.first(where: { $0.name == "Datasource" }) else {
+                throw MVTPostgisError.xmlError(message: "Layer '\(name)' is missing a Datasource")
             }
 
             var user = ""
@@ -99,10 +105,10 @@ struct MapnikXMLSource {
             var type = ""
             var sql = ""
 
-            datasourceElement.childElements.forEach({ element in
+            for element in datasourceElement.childElements {
                 guard let nameAttribute = element.attributes["name"],
                       let value = element.text ?? element.CDATA?.asUTF8EncodedString
-                else { return }
+                else { continue }
 
                 switch nameAttribute {
                 case "user": user = value
@@ -115,31 +121,22 @@ struct MapnikXMLSource {
                 case "srid": srid = value
                 case "type": type = value
                 case "table": sql = value
-                default: return
+                default: continue
                 }
-            })
+            }
 
             guard user.isNotEmpty,
-                  password.isNotEmpty,
                   host.isNotEmpty,
                   databaseName.isNotEmpty,
                   type.isNotEmpty,
                   sql.isNotEmpty
             else {
-                print("Missing datasource info in layer \(name)")
-                return
+                throw MVTPostgisError.xmlError(message: "Layer '\(name)' has incomplete datasource parameters")
             }
 
             let layerFields = layerFields[name] ?? [:]
 
-            // Supported:
-            // srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
-            // srs: +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over
-            let layerProjection: Projection = switch srs.lowercased() {
-            case "+proj=longlat +ellps=wgs84 +datum=wgs84 +no_defs": .epsg4326
-            case "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over": .epsg3857
-            default: .noSRID
-            }
+            let layerProjection = MapnikSRS.projection(from: srs)
 
             var datasourceProjection = layerProjection
             if let srid = Int(srid), srid > 0 {
@@ -147,7 +144,7 @@ struct MapnikXMLSource {
             }
 
             var datasourceBoundingBox: BoundingBox?
-            let components = extent.components(separatedBy: ",").compactMap({ $0.toDouble })
+            let components = extent.components(separatedBy: ",").compactMap(\.toDouble)
             if components.count == 4 {
                 datasourceBoundingBox = BoundingBox(
                     southWest: Coordinate3D(x: components[0], y: components[1], projection: datasourceProjection),
@@ -160,7 +157,7 @@ struct MapnikXMLSource {
                 host: host,
                 port: port,
                 databaseName: databaseName,
-                geometryField: geometryField,
+                geometryField: geometryField.nilIfEmpty,
                 boundingBox: datasourceBoundingBox,
                 srid: datasourceProjection,
                 type: type,
@@ -172,13 +169,13 @@ struct MapnikXMLSource {
                 properties: .init(bufferSize: bufferSize),
                 datasource: datasource)
             layers.append(layer)
-        })
+        }
 
         guard layers.isNotEmpty else {
             throw MVTPostgisError.xmlError(message: "Datasource without layers")
         }
 
-        let source = PostgisSource(
+        return PostgisSource(
             name: name,
             description: description,
             attribution: attribution,
@@ -188,8 +185,6 @@ struct MapnikXMLSource {
             maxZoom: maxZoom,
             layers: layers,
             origin: .xml)
-
-        return source
     }
 
     // MARK: -

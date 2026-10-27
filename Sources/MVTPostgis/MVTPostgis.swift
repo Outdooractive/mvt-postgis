@@ -2,8 +2,8 @@ import Atomics
 import Foundation
 import GISTools
 import MVTTools
-import PostgresNIO
 import PostgresConnectionPool
+import PostgresNIO
 
 // https://github.com/mapnik/mapnik/wiki/PostGIS
 // https://github.com/mapnik/mapnik/wiki/OptimizeRenderingWithPostGIS
@@ -19,8 +19,7 @@ public final class MVTPostgis: Sendable {
     /// Used when no explicit ``configuration`` is passed to the initializer.
     /// Changes after the first instance is created have no effect on existing instances.
     /// See ``MVTPostgisConfiguration``.
-    nonisolated(unsafe)
-    public static var configuration: MVTPostgisConfiguration = MVTPostgisConfiguration()
+    public nonisolated(unsafe) static var configuration: MVTPostgisConfiguration = .init()
 
     private static let postgisDatasourceTypeCode = "postgis"
     private static let batchId: ManagedAtomic<Int> = .init(0)
@@ -62,7 +61,7 @@ public final class MVTPostgis: Sendable {
         sourceURL: URL,
         externalName: String? = nil,
         layerAllowlist: [String]? = nil,
-        logger: Logger? = nil
+        logger: Logger? = nil,
     ) throws {
         let source = try PostgisSource.load(
             from: sourceURL,
@@ -88,7 +87,7 @@ public final class MVTPostgis: Sendable {
         sourceData: Data,
         externalName: String? = nil,
         layerAllowlist: [String]? = nil,
-        logger: Logger? = nil
+        logger: Logger? = nil,
     ) throws {
         let source = try PostgisSource.load(
             from: sourceData,
@@ -110,25 +109,27 @@ public final class MVTPostgis: Sendable {
     ///   - configuration: Optional instance-specific configuration. When `nil`, ``MVTPostgis/configuration`` is used.
     ///   - logger: An optional logger. If `nil`, a default logger is created.
     /// - Throws: ``MVTPostgisError/needLayers`` if the source has no layers,
-    ///   ``MVTPostgisError/wrongDatasourceType`` if a layer is not of type `"postgis"`,
+    ///   `MVTPostgisError/wrongDatasourceType(message:)` if a layer is not of type `"postgis"`,
     ///   or ``MVTPostgisError/unsupportedSRID`` if the datasource uses an unsupported projection.
     public init(
         source: PostgisSource,
         externalName: String? = nil,
         configuration: MVTPostgisConfiguration? = nil,
-        logger: Logger? = nil
+        logger: Logger? = nil,
     ) throws {
-        guard source.layers.count > 0 else { throw MVTPostgisError.needLayers }
-
+        guard source.layers.isEmpty == false else { throw MVTPostgisError.needLayers }
+        guard source.layers.allSatisfy(\.id.isNotEmpty) else {
+            throw MVTPostgisError.invalidLayerId
+        }
         guard source.layers.allSatisfy({ $0.datasource.type == MVTPostgis.postgisDatasourceTypeCode }) else {
             throw MVTPostgisError.wrongDatasourceType(message: "All datasources must be of type '\(MVTPostgis.postgisDatasourceTypeCode)'")
         }
+        guard source.layers.allSatisfy({ $0.datasource.srid == .epsg3857 || $0.datasource.srid == .epsg4326 }) else {
+            throw MVTPostgisError.unsupportedSRID
+        }
 
         let layer = source.layers[0]
-        let datasource = layer.datasource
-
-        projection = datasource.srid
-        guard projection != .noSRID else { throw MVTPostgisError.unsupportedSRID }
+        self.projection = layer.datasource.srid
 
         self.source = source
         self.externalName = externalName
@@ -163,7 +164,7 @@ public final class MVTPostgis: Sendable {
     }
 
     /// Returns information about all active database pools and their connections.
-    /// - Returns: An array of ``PoolInfo`` structs, one per database pool.
+    /// - Returns: An array of `PoolInfo` structs, one per database pool.
     public func poolInfos() async -> [PoolInfo] {
         await poolDistributor.poolInfos()
     }
@@ -189,13 +190,12 @@ public final class MVTPostgis: Sendable {
     ///   missing table/column, connection failure, etc.
     public func validate(
         sql: String,
-        forLayer layer: PostgisLayer
+        forLayer layer: PostgisLayer,
     ) async -> String? {
-
         let preparedSQL = sql
-            .replacingOccurrences(of: "!bbox!", with: "ST_MakeEnvelope(0, 0, 1, 1, 3857)")
-            .replacingOccurrences(of: "!scale_denominator!", with: "1000")
-            .replacingOccurrences(of: "!pixel_width!", with: "1")
+            .replacing("!bbox!", with: "ST_MakeEnvelope(0, 0, 1, 1, 3857)")
+            .replacing("!scale_denominator!", with: "1000")
+            .replacing("!pixel_width!", with: "1")
         let explainSQL = "EXPLAIN \(preparedSQL)"
         let batchId = MVTPostgis.batchId.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
 
@@ -229,29 +229,30 @@ public final class MVTPostgis: Sendable {
     public func data(
         forTile tile: MapTile,
         format: TileOutputFormat,
-        options: VectorTile.ExportOptions
+        options: VectorTile.ExportOptions,
     ) async throws -> (data: Data?, performance: [String: MVTLayerPerformanceData]?) {
-        let result = try await self.vectorTile(forTile: tile, options: options)
-        let data: Data? = switch format {
-        case .mvt: result.tile.mvtData(options: options)
-        case .mlt: result.tile.mltData(options: options)
-        }
+        let result = try await vectorTile(forTile: tile, options: options)
+        let data: Data? =
+            switch format {
+            case .mvt: result.tile.mvtData(options: options)
+            case .mlt: result.tile.mltData(options: options)
+            }
         return (data, result.performance)
     }
 
     /// Create a tile at the given z/x/y coordinate by querying all configured layers.
     ///
-    /// Returns a ``VectorTile`` that can be encoded to any output format
-    /// via ``VectorTile/mvtData(options:)`` or ``VectorTile/mltData(options:)``.
+    /// Returns a `VectorTile` that can be encoded to any output format
+    /// via `mvtData(options:)` or `mltData(options:)`.
     ///
     /// - Parameters:
     ///   - tile: The map tile to render.
     ///   - options: Export options controlling buffering (other options like compression are applied during encoding).
-    /// - Returns: A tuple of the generated ``VectorTile`` and optional per-layer performance statistics.
+    /// - Returns: A tuple of the generated `VectorTile` and optional per-layer performance statistics.
     /// - Throws: ``MVTPostgisError`` if the tile is out of bounds, the request is cancelled, or a query times out.
     public func vectorTile(
         forTile tile: MapTile,
-        options: VectorTile.ExportOptions? = nil
+        options: VectorTile.ExportOptions? = nil,
     ) async throws -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) {
         if Task.isCancelled {
             throw MVTPostgisError.cancelled
@@ -262,7 +263,6 @@ public final class MVTPostgis: Sendable {
         return try await withThrowingTaskGroup(
             of: (String, String, [Feature], MVTLayerPerformanceData).self,
             body: { group -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) in
-                // Note: Geometries loaded from WKB will always be projected to EPSG:4326
                 var tileVar = try VectorTile(tile: tile, projection: projection)
 
                 // https://github.com/mapnik/mapnik/blob/master/src/scale_denominator.cpp
@@ -275,97 +275,69 @@ public final class MVTPostgis: Sendable {
                 let simplificationTolerance = simplificationTolerance(pixelWidth: pixelWidth, atZoom: tile.z)
 
                 let deadline = Date(timeIntervalSinceNow: self.configuration.tileTimeout)
-                let expectedTasksCount = source.layers.count
+                var queryTasksCount = 0
                 var finishedTasksCount = 0
 
                 for layer in source.layers {
+                    let layerProjection = layer.datasource.srid
                     let bounds = try queryBounds(
                         tile: tile,
                         tileSize: VectorTile.ExportOptions.tileSize, // pixels
-                        bufferSize: layer.properties.bufferSize) // pixels
+                        bufferSize: layer.properties.bufferSize, // pixels
+                        projection: layerProjection)
 
                     // Skip layers whose bounding box doesn't intersect the tile
-                    if let projectedBox = layer.datasource.boundingBox?.projected(to: projection),
-                       !projectedBox.intersects(bounds)
+                    if let projectedBox = layer.datasource.boundingBox?.projected(to: layerProjection),
+                       projectedBox.intersects(bounds) == false
                     {
                         continue
                     }
 
                     let envelope = "ST_MakeEnvelope(\(bounds.southWest.longitude), \(bounds.southWest.latitude), \(bounds.northEast.longitude), \(bounds.northEast.latitude), \(bounds.projection.srid))"
 
-                    let sql = layer.datasource.sql
+                    let sql = layer.datasource
+                        .sql
                         .replacing("!bbox!", with: envelope)
                         .replacing("!scale_denominator!", with: String(scaleDenominator))
                         .replacing("!pixel_width!", with: String(pixelWidth))
 
-                    let geometryField = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
                     let simplificationOption = self.configuration.simplification(tile.z, self.source)
                     let clippingOption = self.configuration.clipping(tile.z, self.source)
                     let validationOption = self.configuration.validation(tile.z, self.source)
-                    var columns = layer.fields.keys.map({ "\"\($0)\"" })
-                    var useLocalSimplification = false
 
-                    // Assemble the geometry query
-                    var postgisGeometryColumn = "ST_AsBinary("
-                    switch validationOption {
-                    case .none: break
-                    default: postgisGeometryColumn.append("ST_MakeValid(")
-                    }
-                    switch simplificationOption {
-                    case .postgis, .meters(_, _): postgisGeometryColumn.append("ST_Simplify(")
-                    case .local: useLocalSimplification = true
-                    default: break
-                    }
-                    if clippingOption == .postgis {
-                        postgisGeometryColumn.append("ST_ClipByBox2D(")
-                    }
-                    postgisGeometryColumn.append("\"\(geometryField)\"")
-                    if clippingOption == .postgis {
-                        postgisGeometryColumn.append(",\(envelope))")
-                    }
-                    if case let .postgis(preserveCollapsed) = simplificationOption {
-                        postgisGeometryColumn.append(",\(simplificationTolerance)")
-                        if preserveCollapsed {
-                            postgisGeometryColumn.append(",true")
-                        }
-                        postgisGeometryColumn.append(")")
-                    }
-                    else if case let .meters(meters, preserveCollapsed) = simplificationOption {
-                        postgisGeometryColumn.append(",\(meters)")
-                        if preserveCollapsed {
-                            postgisGeometryColumn.append(",true")
-                        }
-                        postgisGeometryColumn.append(")")
-                    }
-                    switch validationOption {
-                    case .none:
-                        break
-                    case .`default`, .linework:
-                        postgisGeometryColumn.append(")")
-                    case let .structure(keepCollapsed):
-                        postgisGeometryColumn.append(", 'method=structure keepcollapsed=\(keepCollapsed)')")
-                    }
-                    postgisGeometryColumn.append(")")
-                    postgisGeometryColumn.append(" AS \"\(geometryField)\"")
-                    columns.append(postgisGeometryColumn)
-
-                    // The final query
-                    let query = "SELECT \(columns.joined(separator: ",")) FROM \(sql)"
+                    let builder = PostgisQueryBuilder(
+                        layer: layer,
+                        sql: sql,
+                        envelope: envelope,
+                        simplificationTolerance: simplificationTolerance,
+                        clipping: clippingOption,
+                        simplification: simplificationOption,
+                        validation: validationOption)
 
                     let clipBounds = (clippingOption == .local ? bounds : nil)
-                    let localSimplificationTolerance = (useLocalSimplification ? simplificationTolerance : nil)
+                    let localSimplificationTolerance = (builder.usesLocalSimplification ? simplificationTolerance : nil)
 
+                    queryTasksCount += 1
                     group.addTask {
                         let (features, performanceData) = try await self.load(
-                            query: query,
+                            query: builder.query,
                             layer: layer,
-                            projection: self.projection,
+                            projection: layerProjection,
                             clipBounds: clipBounds,
                             simplificationTolerance: localSimplificationTolerance,
                             featureMapping: self.configuration.featureMapping,
                             batchId: nextBatchId)
                         return (layer.id, layer.datasource.databaseName, features, performanceData)
                     }
+                }
+
+                var layerIdToRuntimeMapping: [String: MVTLayerPerformanceData]?
+                if self.configuration.trackRuntimes {
+                    layerIdToRuntimeMapping = [:]
+                }
+
+                guard queryTasksCount > 0 else {
+                    return (tileVar, layerIdToRuntimeMapping)
                 }
 
                 // Add a timeout for the whole tile/batch
@@ -379,7 +351,7 @@ public final class MVTPostgis: Sendable {
                     if interval > 0 {
                         try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                     }
-                    guard !Task.isCancelled else {
+                    guard Task.isCancelled == false else {
                         return ("", "", [], MVTLayerPerformanceData(runtime: 0.0, wkbBytes: 0, features: 0, invalidFeatures: 0, sqlQuery: ""))
                     }
 
@@ -397,11 +369,6 @@ public final class MVTPostgis: Sendable {
                     throw MVTPostgisError.tileTimedOut(queries: timedOutQueries)
                 }
 
-                var layerIdToRuntimeMapping: [String: MVTLayerPerformanceData]?
-                if self.configuration.trackRuntimes {
-                    layerIdToRuntimeMapping = [:]
-                }
-
                 do {
                     for try await (layerId, databaseName, features, performanceData) in group {
                         guard layerId.isNotEmpty else { continue }
@@ -412,9 +379,8 @@ public final class MVTPostgis: Sendable {
                             layerIdToRuntimeMapping?["\(externalName ?? source.name).\(databaseName).\(layerId)"] = performanceData
                         }
 
-                        // The last task to finish is (should be) the timeout task
                         finishedTasksCount += 1
-                        if finishedTasksCount == expectedTasksCount {
+                        if finishedTasksCount == queryTasksCount {
                             group.cancelAll()
                         }
                     }
@@ -434,19 +400,18 @@ public final class MVTPostgis: Sendable {
     private func queryBounds(
         tile: MapTile,
         tileSize: Int,
-        bufferSize: Int
+        bufferSize: Int,
+        projection: Projection,
     ) throws -> BoundingBox {
         var bounds: BoundingBox
 
         switch projection {
-        case .noSRID:
-            throw MVTPostgisError.unsupportedSRID
         case .epsg3857:
             bounds = tile.boundingBox(projection: .epsg3857)
         case .epsg4326:
             bounds = tile.boundingBox(projection: .epsg4326)
-        case .epsg4978:
-            bounds = tile.boundingBox(projection: .epsg4978).projected(to: .epsg4326)
+        default:
+            throw MVTPostgisError.unsupportedSRID
         }
 
         if bufferSize != 0 {
@@ -466,13 +431,14 @@ public final class MVTPostgis: Sendable {
 
     private func simplificationTolerance(
         pixelWidth: Double,
-        atZoom zoom: Int
+        atZoom zoom: Int,
     ) -> Double {
         // pixelWidth at zoom 10
         pixelWidth * ((((0.6 - 1.4) / 20.0) * Double(zoom)) + 1.4)
     }
 
-    // The resulting features will always be projected to EPSG:4326
+    /// The resulting features are in the layer's projection. The caller
+    /// projects them into the tile projection when appending them.
     private func load(
         query: String,
         layer: PostgisLayer,
@@ -480,7 +446,7 @@ public final class MVTPostgis: Sendable {
         clipBounds: BoundingBox?,
         simplificationTolerance: Double?,
         featureMapping: (@Sendable (_ feature: Feature) -> Feature)?,
-        batchId: Int
+        batchId: Int,
     ) async throws -> (features: [Feature], performance: MVTLayerPerformanceData) {
         if Task.isCancelled {
             throw MVTPostgisError.cancelled
@@ -501,7 +467,7 @@ public final class MVTPostgis: Sendable {
                 let rowSequence = try await connection.query(PostgresQuery(stringLiteral: query), logger: logger)
 
                 // Probably a long running connection
-                guard !connection.isClosed else {
+                guard connection.isClosed == false else {
                     throw MVTPostgisError.connectionFailed
                 }
 
@@ -522,43 +488,49 @@ public final class MVTPostgis: Sendable {
                         guard field.columnName != geometryColumn else { continue }
 
                         switch field.dataType {
-                        case .bpchar, .varchar, .text:
+                        case .bpchar, .text, .varchar:
                             properties[field.columnName] = row[data: field.columnName].string
-                        case .varcharArray, .textArray:
+
+                        case .textArray, .varcharArray:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.compactMap({ $0.string })
+                                properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .uuid:
                             properties[field.columnName] = row[data: field.columnName].string
+
                         case .uuidArray:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.compactMap({ $0.string })
+                                properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .int2, .int4, .int8:
                             properties[field.columnName] = row[data: field.columnName].int
+
                         case .int2Array, .int4Array, .int8Array:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map({ $0.int })
+                                properties[field.columnName] = array.map(\.int)
                             }
 
                         case .float4, .float8, .numeric:
                             properties[field.columnName] = row[data: field.columnName].double
+
                         case .float4Array, .float8Array:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map({ $0.double })
+                                properties[field.columnName] = array.map(\.double)
                             }
 
                         case .bool:
                             properties[field.columnName] = row[data: field.columnName].bool
+
                         case .boolArray:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map({ $0.bool })
+                                properties[field.columnName] = array.map(\.bool)
                             }
 
                         case .date, .timestamp, .timestamptz:
                             properties[field.columnName] = row[data: field.columnName].date?.ISO8601Format()
+
                         case .dateArray, .timestampArray, .timestamptzArray:
                             if let array = row[data: field.columnName].array {
                                 properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format })
@@ -600,6 +572,7 @@ public final class MVTPostgis: Sendable {
                             invalidFeatures.set(invalidFeatures.item + 1)
                             continue
                         }
+
                         features.append(clippedFeature.simplified(tolerance: simplificationTolerance))
                     }
                     else if let clipBounds {
@@ -607,6 +580,7 @@ public final class MVTPostgis: Sendable {
                             invalidFeatures.set(invalidFeatures.item + 1)
                             continue
                         }
+
                         features.append(clippedFeature)
                     }
                     else if let simplificationTolerance {

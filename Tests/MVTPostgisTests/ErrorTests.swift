@@ -10,50 +10,55 @@ struct MVTPostgisErrorTests {
     }
 
     @Test
-    func connectionFailed() {
+    func `connection failed`() {
         #expect(MVTPostgisError.connectionFailed.description == "Connection failed")
     }
 
     @Test
-    func needLayers() {
+    func `need layers`() {
         #expect(MVTPostgisError.needLayers.description == "Need layers")
     }
 
     @Test
-    func tileOutOfBounds() {
+    func `invalid layer id`() {
+        #expect(MVTPostgisError.invalidLayerId.description == "Invalid layer id")
+    }
+
+    @Test
+    func `tile out of bounds`() {
         #expect(MVTPostgisError.tileOutOfBounds.description == "Tile out of bounds")
     }
 
     @Test
-    func tileTimedOut() {
+    func `tile timed out`() {
         let error = MVTPostgisError.tileTimedOut(queries: ["SELECT 1"])
         #expect(error.description == "Tile timed out:\nQuery #1:\nSELECT 1")
     }
 
     @Test
-    func unsupportedSRID() {
+    func `unsupported SRID`() {
         #expect(MVTPostgisError.unsupportedSRID.description == "Unsupported SRID")
     }
 
     @Test
-    func unsupportedSRS() {
+    func `unsupported SRS`() {
         #expect(MVTPostgisError.unsupportedSRS.description == "Unsupported SRS")
     }
 
     @Test
-    func wrongDatasourceType() {
+    func `wrong datasource type`() {
         let error = MVTPostgisError.wrongDatasourceType(message: "test")
         #expect(error.description == "Wrong datasource type: test")
     }
 
     @Test
-    func xmlError() {
+    func `xml error`() {
         let error = MVTPostgisError.xmlError(message: "parse error")
         #expect(error.description == "XML error: parse error")
     }
 
     @Test
-    func layerAllowlistFiltersJSON() throws {
+    func `layer allowlist filters JSON`() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -96,6 +101,25 @@ struct MVTPostgisErrorTests {
 
         let filtered = try PostgisSource.load(from: data, layerAllowlist: ["roads"])
         #expect(filtered.layers.count == 1)
+    }
+
+}
+
+struct PerformanceDataTests {
+
+    @Test
+    func `stores all values`() {
+        let data = MVTLayerPerformanceData(
+            runtime: 1.5,
+            wkbBytes: 42,
+            features: 3,
+            invalidFeatures: 1,
+            sqlQuery: "SELECT 1")
+        #expect(data.runtime == 1.5)
+        #expect(data.wkbBytes == 42)
+        #expect(data.features == 3)
+        #expect(data.invalidFeatures == 1)
+        #expect(data.sqlQuery == "SELECT 1")
     }
 
 }

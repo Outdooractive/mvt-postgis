@@ -11,7 +11,7 @@ and assemble MVT tiles — with connection pooling, configurable timeouts, and r
 
 ## Requirements
 
-This package requires Swift 6.3 or higher (at least Xcode 15), and compiles on macOS (\>= macOS 15) as well as Linux.
+This package requires Swift 6.3 or higher (Xcode 26 or newer), and compiles on macOS (>= macOS 15) as well as Linux.
 
 ## Installation with Swift Package Manager
 
@@ -26,9 +26,11 @@ targets: [
 ]
 ```
 
-This project builds on two other libraries that handle the heavy lifting:
+This project builds on several libraries that handle the heavy lifting:
 - [**gis-tools**](https://github.com/Outdooractive/gis-tools) — geometry types, projections, WKB coding, R-Tree
-- [**mvt-tools**](https://github.com/Outdooractive/mvt-tools) — VectorTile model, MVT encode/decode, ExportOptions
+- [**mvt-tools**](https://github.com/Outdooractive/mvt-tools) — VectorTile model, MVT/MLT encode/decode, ExportOptions
+- [**PostgresConnectionPool**](https://github.com/Outdooractive/PostgresConnectionPool) and [**PostgresNIO**](https://github.com/vapor/postgres-nio) — database access and pooling
+- [**Yams**](https://github.com/jpsim/Yams) and [**SwiftyXMLParser**](https://github.com/yahoojapan/SwiftyXMLParser) — source parsing
 
 ## Features
 
@@ -187,21 +189,21 @@ The JSON format mirrors the `PostgisSource` → `PostgisLayer` → `PostgisDatas
 | Field | Type | Description |
 |---|---|---|
 | `name` | string | Source name |
-| `description` | string | Source description |
-| `attribution` | string | Copyright attribution |
-| `center` | [lon, lat] | Default center coordinate |
-| `defaultZoom` | integer | Default zoom level |
-| `minZoom` | integer | Minimum zoom |
-| `maxZoom` | integer | Maximum zoom |
+| `description` | string? | Source description (default: empty) |
+| `attribution` | string? | Copyright attribution (default: empty) |
+| `center` | [lon, lat]? | Default center coordinate (default: `[0, 0]`) |
+| `defaultZoom` | integer? | Default zoom level (default: 14) |
+| `minZoom` | integer? | Minimum zoom (default: 0) |
+| `maxZoom` | integer? | Maximum zoom (default: 20) |
 | `layers[]` | array | Array of layer definitions |
 | `layers[].id` | string | Layer name |
 | `layers[].description` | string? | Optional layer description |
-| `layers[].fields` | object | Map of field names to descriptions |
-| `layers[].properties.bufferSize` | integer | Tile buffer in pixels |
+| `layers[].fields` | object? | Map of field names to descriptions (default: empty) |
+| `layers[].properties.bufferSize` | integer? | Tile buffer in pixels (default: 0) |
 | `layers[].datasource.user` | string | PostgreSQL user |
-| `layers[].datasource.password` | string | PostgreSQL password |
+| `layers[].datasource.password` | string? | PostgreSQL password (default: empty) |
 | `layers[].datasource.host` | string | PostgreSQL hostname |
-| `layers[].datasource.port` | integer | PostgreSQL port |
+| `layers[].datasource.port` | integer? | PostgreSQL port (default: 5432) |
 | `layers[].datasource.databaseName` | string | Database name |
 | `layers[].datasource.geometryField` | string? | Geometry column name (default: `"geometry"`) |
 | `layers[].datasource.boundingBox` | [minLon, minLat, maxLon, maxLat]? | Datasource extent |
@@ -217,6 +219,15 @@ Always call `shutdown()` when done to close all database connections:
 
 ``` swift
 try await mvtPostgis.shutdown()
+```
+
+## Development
+
+```bash
+swift build
+swift test
+scripts/run-coverage.sh 60
+python3 scripts/check_documentation.py
 ```
 
 ## See also
