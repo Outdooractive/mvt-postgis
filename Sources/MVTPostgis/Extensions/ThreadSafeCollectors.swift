@@ -4,7 +4,7 @@ import Foundation
 
 /// A thread-safe array that can be read and written from multiple concurrent tasks.
 ///
-/// Uses an ``NSLock`` internally to synchronize access. Marked `@unchecked Sendable`
+/// Uses an `NSLock` internally to synchronize access. Marked `@unchecked Sendable`
 /// because the lock guarantees thread safety despite the class containing mutable state.
 public final class ThreadSafeArrayCollector<T>: @unchecked Sendable {
 
@@ -14,7 +14,7 @@ public final class ThreadSafeArrayCollector<T>: @unchecked Sendable {
     /// Creates a collector, optionally seeded with initial values.
     /// - Parameter initial: The initial array contents.
     public init(_ initial: [T] = []) {
-        array = initial
+        self.array = initial
     }
 
     /// Appends a single element.
@@ -47,13 +47,20 @@ public final class ThreadSafeArrayCollector<T>: @unchecked Sendable {
         return array.count
     }
 
+    /// Whether the collector currently contains no elements.
+    public var isEmpty: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return array.isEmpty
+    }
+
 }
 
 // MARK: - ThreadSafeObjectCollector
 
 /// A thread-safe mutable object reference that can be read and written from multiple concurrent tasks.
 ///
-/// Uses an ``NSLock`` internally to synchronize access.
+/// Uses an `NSLock` internally to synchronize access.
 public final class ThreadSafeObjectCollector<T>: @unchecked Sendable {
 
     private var object: T
@@ -62,7 +69,7 @@ public final class ThreadSafeObjectCollector<T>: @unchecked Sendable {
     /// Creates a collector with the given initial value.
     /// - Parameter initial: The initial value.
     public init(_ initial: T) {
-        object = initial
+        self.object = initial
     }
 
     /// Atomically replaces the stored value.

@@ -36,21 +36,23 @@ public struct PostgisSource: Codable, Sendable {
     /// The source's maximum zoom level.
     public let maxZoom: Int
 
-    /// The source's layers with the Postgis configuration and SQL.
+    /// The source's layers with the PostGIS configuration and SQL.
     public let layers: [PostgisLayer]
 
     /// The file format this source was parsed from.
     public private(set) var origin: Origin
 
-    public init(name: String,
-         description: String,
-         attribution: String,
-         center: Coordinate3D,
-         defaultZoom: Int,
-         minZoom: Int,
-         maxZoom: Int,
-         layers: [PostgisLayer],
-         origin: Origin = .json
+    /// Creates a source definition.
+    public init(
+        name: String,
+        description: String = "",
+        attribution: String = "",
+        center: Coordinate3D = .zero,
+        defaultZoom: Int = 14,
+        minZoom: Int = 0,
+        maxZoom: Int = 20,
+        layers: [PostgisLayer],
+        origin: Origin = .json,
     ) {
         self.name = name
         self.description = description
@@ -65,22 +67,38 @@ public struct PostgisSource: Codable, Sendable {
 
     // MARK: -
 
-    /// Load a source from an URL, can either be JSON, or Mapnik YML or XML.
+    /// Load a source from a URL. The file can be JSON, Mapnik YML, or Mapnik XML.
+    ///
+    /// - Parameters:
+    ///   - url: The source file URL.
+    ///   - layerAllowlist: Optional list of layer names to include. When `nil`
+    ///     or empty, all layers are included.
+    /// - Returns: The parsed source.
+    /// - Throws: Decoding or XML parsing errors.
     public static func load(
         from url: URL,
-        layerAllowlist: [String]?
+        layerAllowlist: [String]?,
     ) throws -> PostgisSource {
         let data = try Data(contentsOf: url)
         return try load(from: data, layerAllowlist: layerAllowlist)
     }
 
-    /// Load a source from a Data object, can either be JSON, or Mapnik YML or XML.
+    /// Load a source from raw data. The data can be JSON, Mapnik YML, or Mapnik XML.
+    ///
+    /// - Parameters:
+    ///   - data: The raw source data.
+    ///   - layerAllowlist: Optional list of layer names to include. When `nil`
+    ///     or empty, all layers are included.
+    /// - Returns: The parsed source.
+    /// - Throws: Decoding or XML parsing errors.
     public static func load(
         from data: Data,
-        layerAllowlist: [String]?
+        layerAllowlist: [String]?,
     ) throws -> PostgisSource {
-        if data.starts(with: [0x7B]) {
-            var source = try JSONDecoder().decode(PostgisSource.self, from: data)
+        let payload = data.trimmingLeadingConfigurationWhitespace()
+
+        if payload.first == 0x7B {
+            var source = try JSONDecoder().decode(PostgisSource.self, from: payload)
             source.origin = .json
 
             guard let layerAllowlist,
@@ -98,30 +116,32 @@ public struct PostgisSource: Codable, Sendable {
                 layers: source.layers.filter { layerAllowlist.contains($0.id) },
                 origin: .json)
         }
-        else if data.starts(with: [0x3C, 0x3F, 0x78, 0x6D, 0x6C, 0x20]) {
-            return try MapnikXMLSource.load(from: data, layerAllowlist: layerAllowlist ?? [])
+        else if payload.first == 0x3C {
+            return try MapnikXMLSource.load(from: payload, layerAllowlist: layerAllowlist ?? [])
         }
         else {
-            return try MapnikYMLSource.load(from: data, layerAllowlist: layerAllowlist ?? [])
+            return try MapnikYMLSource.load(from: payload, layerAllowlist: layerAllowlist ?? [])
         }
     }
 
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
+
         case name, description, attribution, center, defaultZoom, minZoom, maxZoom, layers
+
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.name = try container.decode(String.self, forKey: .name)
-        self.description = try container.decode(String.self, forKey: .description)
-        self.attribution = try container.decode(String.self, forKey: .attribution)
-        self.center = try container.decode(Coordinate3D.self, forKey: .center)
-        self.defaultZoom = try container.decode(Int.self, forKey: .defaultZoom)
-        self.minZoom = try container.decode(Int.self, forKey: .minZoom)
-        self.maxZoom = try container.decode(Int.self, forKey: .maxZoom)
-        self.layers = try container.decode([PostgisLayer].self, forKey: .layers)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        self.attribution = try container.decodeIfPresent(String.self, forKey: .attribution) ?? ""
+        self.center = try container.decodeIfPresent(Coordinate3D.self, forKey: .center) ?? .zero
+        self.defaultZoom = try container.decodeIfPresent(Int.self, forKey: .defaultZoom) ?? 14
+        self.minZoom = try container.decodeIfPresent(Int.self, forKey: .minZoom) ?? 0
+        self.maxZoom = try container.decodeIfPresent(Int.self, forKey: .maxZoom) ?? 20
+        self.layers = try container.decodeIfPresent([PostgisLayer].self, forKey: .layers) ?? []
         self.origin = .json
     }
 
@@ -135,6 +155,24 @@ public struct PostgisSource: Codable, Sendable {
         try container.encode(minZoom, forKey: .minZoom)
         try container.encode(maxZoom, forKey: .maxZoom)
         try container.encode(layers, forKey: .layers)
+    }
+
+}
+
+// MARK: - Private
+
+extension Data {
+
+    /// Removes a UTF-8 BOM and leading whitespace before format detection.
+    fileprivate func trimmingLeadingConfigurationWhitespace() -> Data {
+        var bytes = [UInt8](self)
+        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
+            bytes.removeFirst(3)
+        }
+        let start = bytes.firstIndex { byte in
+            byte != 0x20 && byte != 0x09 && byte != 0x0A && byte != 0x0D
+        } ?? bytes.endIndex
+        return Data(bytes[start...])
     }
 
 }

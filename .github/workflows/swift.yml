@@ -2,21 +2,82 @@ name: Swift
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+concurrency:
+  group: swift-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-
+  macos:
+    name: test (macOS)
     runs-on: macos-latest
-
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - uses: swift-actions/setup-swift@v3
-      with:
-        swift-version: '6.3.3'
-    - name: Build and Test
-      run: swift test
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.3.3"
+      - name: Build and test
+        run: swift test
+
+  linux:
+    name: test (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: swift:6.3.3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install OpenSSL development files
+        run: apt-get update && apt-get install -y libssl-dev
+      - name: Build and test
+        run: swift test
+
+  coverage:
+    name: coverage (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: swift:6.3.3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install OpenSSL development files
+        run: apt-get update && apt-get install -y libssl-dev
+      - name: Ensure Python
+        run: command -v python3 >/dev/null || (apt-get update && apt-get install -y python3)
+      - name: Run tests with coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          scripts/run-coverage.sh 60 | tee coverage-report.txt
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report.txt
+          if-no-files-found: ignore
+
+  docc:
+    name: documentation (DocC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: swift:6.3.3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Ensure Python
+        run: command -v python3 >/dev/null || (apt-get update && apt-get install -y python3)
+      - name: Build and validate DocC catalog
+        run: python3 scripts/check_documentation.py

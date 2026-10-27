@@ -10,13 +10,16 @@ public enum MVTPostgisError: Error, Equatable, Sendable {
     case connectionFailed
     /// The source doesn't contain any layers.
     case needLayers
+    /// A layer has an empty id.
+    case invalidLayerId
     /// The z/x/y coordinates of the tile are invalid.
     case tileOutOfBounds
     /// The tile timed out, i.e. not all queries return in time.
     case tileTimedOut(queries: [String])
-    /// This library only supports EPSG:3857 and EPSG:4326.
+    /// The datasource uses an unsupported projection. Only planar or
+    /// geographic projections with an SRID are supported.
     case unsupportedSRID
-    /// This library only supports EPSG:3857 and EPSG:4326.
+    /// The Mapnik SRS string could not be mapped to a registered projection.
     case unsupportedSRS
     /// All datasources must be of type "postgis".
     case wrongDatasourceType(message: String)
@@ -33,24 +36,35 @@ extension MVTPostgisError: CustomStringConvertible {
         switch self {
         case .cancelled:
             return "Cancelled"
+
         case .connectionFailed:
             return "Connection failed"
+
         case .needLayers:
             return "Need layers"
+
+        case .invalidLayerId:
+            return "Invalid layer id"
+
         case .tileOutOfBounds:
             return "Tile out of bounds"
-        case .tileTimedOut(let queries):
+
+        case let .tileTimedOut(queries):
             let queryLines = queries.enumerated().map { index, query in
                 "Query #\(index + 1):\n\(query)"
             }
             return "Tile timed out:\n\(queryLines.joined(separator: "\n"))"
+
         case .unsupportedSRID:
             return "Unsupported SRID"
+
         case .unsupportedSRS:
             return "Unsupported SRS"
-        case .wrongDatasourceType(let message):
+
+        case let .wrongDatasourceType(message):
             return "Wrong datasource type: \(message)"
-        case .xmlError(let message):
+
+        case let .xmlError(message):
             return "XML error: \(message)"
         }
     }
