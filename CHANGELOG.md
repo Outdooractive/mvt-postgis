@@ -9,6 +9,8 @@ and this project adheres to semantic versioning.
 
 ### Added
 
+- A deterministic PostGIS integration suite with checked-in SQL fixtures,
+  Docker/CI database setup, fake-loader pipeline tests, and a 90% coverage gate.
 - Public initializers for `PostgisSource`, `PostgisLayer`,
   `PostgisLayer.Properties` and `PostgisDatasource`.
 - DocC catalog with getting-started, source-format, tile-option, pooling and

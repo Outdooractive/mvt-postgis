@@ -115,4 +115,57 @@ struct MVTPostgisInitializationTests {
         #expect(layer.datasource.geometryField == "way")
     }
 
+    @Test
+    func `convenience init from source data`() throws {
+        let json = """
+        {
+          "name": "Data",
+          "layers": [
+            {
+              "id": "layer",
+              "datasource": {
+                "user": "u", "host": "h", "databaseName": "db",
+                "srid": 4326, "type": "postgis",
+                "sql": "SELECT * FROM t"
+              }
+            }
+          ]
+        }
+        """
+        let postgis = try MVTPostgis(
+            sourceData: #require(json.data(using: .utf8)),
+            externalName: "External")
+        #expect(postgis.externalName == "External")
+        #expect(postgis.source.name == "Data")
+        #expect(postgis.source.layers.count == 1)
+    }
+
+    @Test
+    func `convenience init from source URL`() throws {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("mvt-postgis-source-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let json = """
+        {
+          "name": "URL",
+          "layers": [
+            {
+              "id": "layer",
+              "datasource": {
+                "user": "u", "host": "h", "databaseName": "db",
+                "srid": 4326, "type": "postgis",
+                "sql": "SELECT * FROM t"
+              }
+            }
+          ]
+        }
+        """
+        try Data(json.utf8).write(to: url)
+
+        let postgis = try MVTPostgis(sourceURL: url, layerAllowlist: ["layer"])
+        #expect(postgis.source.name == "URL")
+        #expect(postgis.source.layers.count == 1)
+    }
+
 }

@@ -224,12 +224,7 @@ try await mvtPostgis.shutdown()
 
 ## Development
 
-```bash
-swift build
-swift test
-scripts/run-coverage.sh 60
-python3 scripts/check_documentation.py
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for unit, coverage and PostGIS integration test instructions.
 
 ## See also
 

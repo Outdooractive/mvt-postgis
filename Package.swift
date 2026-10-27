@@ -15,6 +15,7 @@ let package = Package(
         .package(url: "https://github.com/Outdooractive/gis-tools", exact: "3.0.0-beta.5"),
         .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "1.0.0"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.2"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.104.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.16.2"),
         .package(url: "https://github.com/apple/swift-atomics", from: "1.3.1"),
         .package(url: "https://github.com/yahoojapan/SwiftyXMLParser", from: "5.6.0"),
@@ -41,6 +42,8 @@ let package = Package(
             dependencies: [
                 "MVTPostgis",
                 .product(name: "PostgresConnectionPool", package: "PostgresConnectionPool"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
