@@ -231,7 +231,15 @@ public final class MVTPostgis: Sendable {
                 with: "ST_MakeEnvelope(0, 0, 1, 1, \(layer.datasource.srid.hasSRID ? layer.datasource.srid.srid : 3857))")
             .replacing("!scale_denominator!", with: "1000")
             .replacing("!pixel_width!", with: "1")
-        let explainSQL = "EXPLAIN \(preparedSQL)"
+
+        // Mapnik datasource SQL is usually wrapped as `(SELECT ...) AS data`,
+        // which `EXPLAIN` cannot take directly. Unwrapped statements (for
+        // example a plain `SELECT ...`) are explained as-is.
+        let trimmedSQL = preparedSQL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let explainTarget = trimmedSQL.hasPrefix("(")
+            ? "SELECT * FROM \(trimmedSQL)"
+            : trimmedSQL
+        let explainSQL = "EXPLAIN \(explainTarget)"
         let batchId = MVTPostgis.batchId.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
 
         do {

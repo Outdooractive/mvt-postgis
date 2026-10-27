@@ -11,7 +11,7 @@ CREATE TABLE "{{schema}}".features (
 INSERT INTO "{{schema}}".features (id, name, kind, geom) VALUES
     (1, 'point', 'point', ST_GeomFromText('POINT(11.5 48.1)', 4326)),
     (2, 'line', 'line', ST_GeomFromText('LINESTRING(11.4 48.0, 11.5 48.1, 11.6 48.2)', 4326)),
-    (3, 'polygon', 'polygon', ST_GeomFromText('POLYGON((11.4 48.0, 11.6 48.0, 11.6 48.2, 11.4 48.2, 11.4 48.0), (11.48 48.08, 11.52 48.08, 11.52 48.12, 11.48 48.12, 11.48 48.08))', 4326)),
+    (3, 'polygon', 'polygon', ST_GeomFromText('POLYGON((11.4 48.0, 11.6 48.0, 11.6 48.2, 11.4 48.2, 11.4 48.0), (11.53 48.13, 11.53 48.17, 11.57 48.17, 11.57 48.13, 11.53 48.13))', 4326)),
     (4, 'multi', 'multipolygon', ST_GeomFromText('MULTIPOLYGON(((11.40 48.00, 11.45 48.00, 11.45 48.05, 11.40 48.05, 11.40 48.00)), ((11.55 48.15, 11.60 48.15, 11.60 48.20, 11.55 48.20, 11.55 48.15)))', 4326)),
     (5, 'collection', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION(POINT(11.5 48.1), LINESTRING(11.4 48.0, 11.6 48.2))', 4326)),
     (6, 'null', 'point', NULL),

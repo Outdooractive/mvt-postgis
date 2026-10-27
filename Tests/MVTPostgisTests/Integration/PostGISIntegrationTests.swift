@@ -370,6 +370,9 @@ struct PostGISIntegrationTests {
                 (SELECT * FROM "\(fixture.schema)".features WHERE geom && !bbox!) AS data
                 """
                 #expect(await postgis.validate(sql: validSQL, forLayer: layer) == nil)
+                #expect(await postgis.validate(
+                    sql: "SELECT * FROM \"\(fixture.schema)\".features",
+                    forLayer: layer) == nil)
                 #expect(await postgis.validate(sql: "SELECT * FROM missing_table", forLayer: layer) != nil)
             }
         }
