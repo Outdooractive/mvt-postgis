@@ -32,18 +32,41 @@ def test_binary(bin_dir: Path) -> Path:
         bin_dir / "MVTPostgisTests.so",
         bin_dir / "MVTPostgisTests",
     ]
+    candidates.extend(bin_dir.glob("*.xctest"))
     candidates.extend(bin_dir.glob("*.xctest/Contents/MacOS/*"))
+
     for candidate in candidates:
         if candidate.is_file():
             return candidate
+
+    for xctest in bin_dir.rglob("*.xctest"):
+        if xctest.is_file():
+            return xctest
+        for candidate in xctest.glob("Contents/MacOS/*"):
+            if candidate.is_file():
+                return candidate
+
+    for candidate in bin_dir.rglob("*"):
+        if (
+            candidate.is_file()
+            and "MVTPostgis" in candidate.name
+            and candidate.stat().st_mode & 0o111
+        ):
+            return candidate
+
     raise SystemExit(f"Test binary not found in {bin_dir}")
 
 
 def profdata_path(bin_dir: Path) -> Path:
     path = bin_dir / "codecov" / "default.profdata"
-    if not path.exists():
-        raise SystemExit(f"Coverage profile not found: {path}")
-    return path
+    if path.exists():
+        return path
+
+    candidates = sorted(bin_dir.rglob("default.profdata"))
+    if candidates:
+        return candidates[0]
+
+    raise SystemExit(f"Coverage profile not found in {bin_dir}")
 
 
 def export_coverage(binary: Path, profdata: Path) -> dict:
