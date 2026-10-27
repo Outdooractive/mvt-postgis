@@ -49,5 +49,5 @@ Each test creates a unique schema, applies the fixture script and drops the
 schema during teardown. Only the schema name is random; all geometry, property,
 UUID, date and array values are fixed.
 
-CI runs the integration tests through a `postgis/postgis:16-3.4` service in the
+CI runs the integration tests through a `postgis/postgis:18-3.6` service in the
 Linux coverage job.
