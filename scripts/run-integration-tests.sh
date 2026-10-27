@@ -12,7 +12,7 @@ cd "$ROOT"
 
 CONTAINER="${MVT_POSTGIS_TEST_CONTAINER:-mvt-postgis-test}"
 HOST_PORT="${MVT_POSTGIS_TEST_PORT:-5432}"
-IMAGE="${MVT_POSTGIS_TEST_IMAGE:-postgis/postgis:16-3.4}"
+IMAGE="${MVT_POSTGIS_TEST_IMAGE:-postgis/postgis:18-3.6}"
 
 if ! command -v docker >/dev/null 2>&1; then
     echo "Docker is required to run the PostGIS integration tests" >&2

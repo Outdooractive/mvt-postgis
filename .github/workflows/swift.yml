@@ -49,7 +49,7 @@ jobs:
     container: swift:6.3.3
     services:
       postgis:
-        image: postgis/postgis:16-3.4
+        image: postgis/postgis:18-3.6
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
