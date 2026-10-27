@@ -78,6 +78,16 @@ final class IntegrationDatabase {
         _ = try await connection.simpleQuery(sql).get()
     }
 
+    func executeScript(_ sql: String) async throws {
+        for statement in sql.split(separator: ";") {
+            let statement = statement.trimmingCharacters(in: .whitespacesAndNewlines)
+            if statement.isEmpty {
+                continue
+            }
+            try await execute(statement)
+        }
+    }
+
     func close() async {
         try? await connection.close().get()
         try? await group.shutdownGracefully()
@@ -110,7 +120,7 @@ final class IntegrationFixture {
                 .appendingPathComponent("fixtures.sql")
             let sql = try String(contentsOf: fixtureURL, encoding: .utf8)
                 .replacing("{{schema}}", with: schema)
-            try await database.execute(sql)
+            try await database.executeScript(sql)
 
             return IntegrationFixture(database: database, schema: schema)
         }
