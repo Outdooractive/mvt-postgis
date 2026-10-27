@@ -1,10 +1,11 @@
-import Testing
+import GISTools
 @testable import MVTPostgis
+import Testing
 
 struct MVTPostgisConfigurationTests {
 
     @Test
-    func configurationDefaults() {
+    func `configuration defaults`() {
         let config = MVTPostgisConfiguration()
         #expect(config.applicationName == "MVTPostgis")
         #expect(config.connectTimeout == 5.0)
@@ -17,7 +18,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func configurationCustomValues() {
+    func `configuration custom values`() {
         let config = MVTPostgisConfiguration(
             applicationName: "Custom",
             connectTimeout: 3.0,
@@ -36,7 +37,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func configurationClampsMinimumValues() {
+    func `configuration clamps minimum values`() {
         let config = MVTPostgisConfiguration(
             connectTimeout: 0.1,
             queryTimeout: 0.1,
@@ -49,20 +50,20 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func configurationDisablesQueryTimeout() {
+    func `configuration disables query timeout`() {
         let config = MVTPostgisConfiguration(queryTimeout: nil)
         #expect(config.queryTimeout == nil)
     }
 
     @Test
-    func clippingOptionAllCases() {
+    func `clipping option all cases`() {
         let _: MVTClippingOption = .none
         let _: MVTClippingOption = .postgis
         let _: MVTClippingOption = .local
     }
 
     @Test
-    func simplificationOptionAllCases() {
+    func `simplification option all cases`() {
         let _: MVTSimplificationOption = .none
         let _: MVTSimplificationOption = .local
         let _: MVTSimplificationOption = .postgis(preserveCollapsed: true)
@@ -72,7 +73,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func validationOptionAllCases() {
+    func `validation option all cases`() {
         let _: MVTMakeValidOption = .none
         let _: MVTMakeValidOption = .default
         let _: MVTMakeValidOption = .linework
@@ -81,7 +82,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func configurationClosures() {
+    func `configuration closures`() {
         let clipBlock: @Sendable (Int, PostgisSource?) -> MVTClippingOption = { _, _ in .postgis }
         let simplBlock: @Sendable (Int, PostgisSource?) -> MVTSimplificationOption = { _, _ in .local }
         let validBlock: @Sendable (Int, PostgisSource?) -> MVTMakeValidOption = { _, _ in .linework }
@@ -98,14 +99,52 @@ struct MVTPostgisConfigurationTests {
 struct TileOutputFormatTests {
 
     @Test
-    func allCases() {
+    func `all cases`() {
         #expect(TileOutputFormat.allCases == [.mvt, .mlt])
     }
 
     @Test
-    func rawValues() {
+    func `raw values`() {
         #expect(TileOutputFormat.mvt.rawValue == "mvt")
         #expect(TileOutputFormat.mlt.rawValue == "mlt")
+    }
+
+    @Test
+    func `configuration closures are invoked`() {
+        let source = PostgisSource(name: "Closures", layers: [])
+        let config = MVTPostgisConfiguration(
+            clipping: { zoom, _ in zoom > 10 ? .local : .postgis },
+            simplification: { zoom, _ in zoom > 10 ? .local : .postgis(preserveCollapsed: true) },
+            validation: { zoom, _ in zoom > 10 ? .structure(keepCollapsed: true) : .none },
+            featureMapping: { feature in
+                var mapped = feature
+                mapped.setProperty(true, for: "mapped")
+                return mapped
+            })
+
+        if case .local = config.clipping(11, source) {
+            // expected
+        }
+        else {
+            Issue.record("Unexpected clipping closure result")
+        }
+
+        if case .local = config.simplification(11, source) {
+            // expected
+        }
+        else {
+            Issue.record("Unexpected simplification closure result")
+        }
+
+        if case .structure(true) = config.validation(11, source) {
+            // expected
+        }
+        else {
+            Issue.record("Unexpected validation closure result")
+        }
+
+        let mapped = config.featureMapping?(Feature(Point(Coordinate3D(latitude: 0, longitude: 0))))
+        #expect(mapped?.properties["mapped"] as? Bool == true)
     }
 
 }

@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-MINIMUM="${1:-60}"
+MINIMUM="${1:-90}"
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 

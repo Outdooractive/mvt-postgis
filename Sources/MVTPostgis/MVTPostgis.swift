@@ -14,6 +14,16 @@ import PostgresNIO
 /// Accepts YML and XML sources (as used by Mapnik and the old Mapbox Studio), and new JSON sources.
 public final class MVTPostgis: Sendable {
 
+    typealias LayerLoader = @Sendable (
+        _ query: String,
+        _ layer: PostgisLayer,
+        _ projection: Projection,
+        _ clipBounds: BoundingBox?,
+        _ simplificationTolerance: Double?,
+        _ featureMapping: (@Sendable (Feature) -> Feature)?,
+        _ batchId: Int,
+    ) async throws -> (features: [Feature], performance: MVTLayerPerformanceData)
+
     /// The default configuration for new ``MVTPostgis`` instances.
     ///
     /// Used when no explicit ``configuration`` is passed to the initializer.
@@ -47,6 +57,7 @@ public final class MVTPostgis: Sendable {
     private let configuration: MVTPostgisConfiguration
     private let logger: Logger
     private let poolDistributor: PoolDistributor
+    private let customLayerLoader: LayerLoader?
 
     // MARK: -
 
@@ -114,11 +125,26 @@ public final class MVTPostgis: Sendable {
     /// - Throws: ``MVTPostgisError/needLayers`` if the source has no layers,
     ///   `MVTPostgisError/wrongDatasourceType(message:)` if a layer is not of type `"postgis"`,
     ///   or ``MVTPostgisError/unsupportedSRID`` if the datasource uses an unsupported projection.
-    public init(
+    public convenience init(
         source: PostgisSource,
         externalName: String? = nil,
         configuration: MVTPostgisConfiguration? = nil,
         logger: Logger? = nil,
+    ) throws {
+        try self.init(
+            source: source,
+            externalName: externalName,
+            configuration: configuration,
+            logger: logger,
+            layerLoader: nil)
+    }
+
+    init(
+        source: PostgisSource,
+        externalName: String? = nil,
+        configuration: MVTPostgisConfiguration? = nil,
+        logger: Logger? = nil,
+        layerLoader: LayerLoader?,
     ) throws {
         guard source.layers.isEmpty == false else { throw MVTPostgisError.needLayers }
         guard source.layers.allSatisfy(\.id.isNotEmpty) else {
@@ -152,6 +178,7 @@ public final class MVTPostgis: Sendable {
         self.poolDistributor = PoolDistributor(
             configuration: self.configuration,
             logger: self.logger)
+        self.customLayerLoader = layerLoader
     }
 
     /// Close all database connections and shut down all connection pools.
@@ -204,7 +231,15 @@ public final class MVTPostgis: Sendable {
                 with: "ST_MakeEnvelope(0, 0, 1, 1, \(layer.datasource.srid.hasSRID ? layer.datasource.srid.srid : 3857))")
             .replacing("!scale_denominator!", with: "1000")
             .replacing("!pixel_width!", with: "1")
-        let explainSQL = "EXPLAIN \(preparedSQL)"
+
+        // Mapnik datasource SQL is usually wrapped as `(SELECT ...) AS data`,
+        // which `EXPLAIN` cannot take directly. Unwrapped statements (for
+        // example a plain `SELECT ...`) are explained as-is.
+        let trimmedSQL = preparedSQL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let explainTarget = trimmedSQL.hasPrefix("(")
+            ? "SELECT * FROM \(trimmedSQL)"
+            : trimmedSQL
+        let explainSQL = "EXPLAIN \(explainTarget)"
         let batchId = MVTPostgis.batchId.loadThenWrappingIncrement(by: 1, ordering: .relaxed)
 
         do {
@@ -273,6 +308,17 @@ public final class MVTPostgis: Sendable {
             body: { group -> (tile: VectorTile, performance: [String: MVTLayerPerformanceData]?) in
                 var tileVar = try VectorTile(tile: tile, projection: projection)
 
+                let layerLoader = self.customLayerLoader ?? { [self] query, layer, projection, clipBounds, simplificationTolerance, featureMapping, batchId in
+                    try await load(
+                        query: query,
+                        layer: layer,
+                        projection: projection,
+                        clipBounds: clipBounds,
+                        simplificationTolerance: simplificationTolerance,
+                        featureMapping: featureMapping,
+                        batchId: batchId)
+                }
+
                 // https://github.com/mapnik/mapnik/blob/master/src/scale_denominator.cpp
                 // https://github.com/openstreetmap/mapnik-stylesheets/blob/master/zoom-to-scale.txt
                 // 0.0293611270703125 ? (in nodejs/wms-client)
@@ -327,14 +373,14 @@ public final class MVTPostgis: Sendable {
 
                     queryTasksCount += 1
                     group.addTask {
-                        let (features, performanceData) = try await self.load(
-                            query: builder.query,
-                            layer: layer,
-                            projection: layerProjection,
-                            clipBounds: clipBounds,
-                            simplificationTolerance: localSimplificationTolerance,
-                            featureMapping: self.configuration.featureMapping,
-                            batchId: nextBatchId)
+                        let (features, performanceData) = try await layerLoader(
+                            builder.query,
+                            layer,
+                            layerProjection,
+                            clipBounds,
+                            localSimplificationTolerance,
+                            self.configuration.featureMapping,
+                            nextBatchId)
                         return (layer.id, layer.datasource.databaseName, features, performanceData)
                     }
                 }
@@ -514,7 +560,7 @@ public final class MVTPostgis: Sendable {
 
                         case .int2Array, .int4Array, .int8Array:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map(\.int)
+                                properties[field.columnName] = array.compactMap(\.int)
                             }
 
                         case .float4, .float8, .numeric:
@@ -522,7 +568,7 @@ public final class MVTPostgis: Sendable {
 
                         case .float4Array, .float8Array:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map(\.double)
+                                properties[field.columnName] = array.compactMap(\.double)
                             }
 
                         case .bool:
@@ -530,7 +576,7 @@ public final class MVTPostgis: Sendable {
 
                         case .boolArray:
                             if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.map(\.bool)
+                                properties[field.columnName] = array.compactMap(\.bool)
                             }
 
                         case .date, .timestamp, .timestamptz:

@@ -43,10 +43,31 @@ jobs:
         run: swift test
 
   coverage:
-    name: coverage (Linux)
+    name: coverage (Linux, PostGIS)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container: swift:6.3.3
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mvt_test
+          TZ: UTC
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mvt_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MVT_POSTGIS_TEST_HOST: postgis
+      MVT_POSTGIS_TEST_PORT: 5432
+      MVT_POSTGIS_TEST_USER: postgres
+      MVT_POSTGIS_TEST_PASSWORD: postgres
+      MVT_POSTGIS_TEST_DATABASE: mvt_test
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          scripts/run-coverage.sh 60 | tee coverage-report.txt
+          scripts/run-coverage.sh 90 | tee coverage-report.txt
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
