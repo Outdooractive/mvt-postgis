@@ -31,7 +31,10 @@ public final class MVTPostgis: Sendable {
 
     /// The source.
     public let source: PostgisSource
-    /// The source's projection (either EPSG:3857 or EPSG:4326).
+    /// The source's projection, taken from the first layer.
+    ///
+    /// Planar and geographic projections registered in GISTools are supported.
+    /// Geocentric projections and `noSRID` are rejected.
     public let projection: Projection
 
     /// Some external name that users can coose to distinguish this
@@ -124,7 +127,10 @@ public final class MVTPostgis: Sendable {
         guard source.layers.allSatisfy({ $0.datasource.type == MVTPostgis.postgisDatasourceTypeCode }) else {
             throw MVTPostgisError.wrongDatasourceType(message: "All datasources must be of type '\(MVTPostgis.postgisDatasourceTypeCode)'")
         }
-        guard source.layers.allSatisfy({ $0.datasource.srid == .epsg3857 || $0.datasource.srid == .epsg4326 }) else {
+        guard source.layers.allSatisfy({
+            $0.datasource.srid.hasSRID
+                && ($0.datasource.srid.kind == .planar || $0.datasource.srid.kind == .geographic)
+        }) else {
             throw MVTPostgisError.unsupportedSRID
         }
 
@@ -193,7 +199,9 @@ public final class MVTPostgis: Sendable {
         forLayer layer: PostgisLayer,
     ) async -> String? {
         let preparedSQL = sql
-            .replacing("!bbox!", with: "ST_MakeEnvelope(0, 0, 1, 1, 3857)")
+            .replacing(
+                "!bbox!",
+                with: "ST_MakeEnvelope(0, 0, 1, 1, \(layer.datasource.srid.hasSRID ? layer.datasource.srid.srid : 3857))")
             .replacing("!scale_denominator!", with: "1000")
             .replacing("!pixel_width!", with: "1")
         let explainSQL = "EXPLAIN \(preparedSQL)"
@@ -403,16 +411,13 @@ public final class MVTPostgis: Sendable {
         bufferSize: Int,
         projection: Projection,
     ) throws -> BoundingBox {
-        var bounds: BoundingBox
-
-        switch projection {
-        case .epsg3857:
-            bounds = tile.boundingBox(projection: .epsg3857)
-        case .epsg4326:
-            bounds = tile.boundingBox(projection: .epsg4326)
-        default:
+        guard projection.hasSRID,
+              projection.kind == .planar || projection.kind == .geographic
+        else {
             throw MVTPostgisError.unsupportedSRID
         }
+
+        var bounds = tile.boundingBox(projection: projection)
 
         if bufferSize != 0 {
             let sqrt2 = 2.0.squareRoot()

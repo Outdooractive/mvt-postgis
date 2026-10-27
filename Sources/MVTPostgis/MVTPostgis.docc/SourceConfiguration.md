@@ -53,11 +53,12 @@ parenthesized subquery with an alias.
 
 ## Projections
 
-Each layer can use EPSG:4326 or EPSG:3857. The tile's projection is taken from
-the first layer, and features from layers with a different projection are
-reprojected when they are appended to the tile.
+Each layer can use any planar or geographic projection registered in GISTools.
+The tile's projection is taken from the first layer, and features from layers
+with a different projection are reprojected when they are appended to the
+tile.
 
-Other projections, `noSRID`, and EPSG:4978 are rejected.
+Geocentric projections such as EPSG:4978 and `noSRID` are rejected.
 
 ## Optional values
 

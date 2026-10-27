@@ -58,19 +58,22 @@ struct MVTPostgisInitializationTests {
 
     @Test
     func `rejects unsupported projection`() {
-        let source = source(srid: .epsg4978)
-        #expect(throws: MVTPostgisError.unsupportedSRID) {
-            try MVTPostgis(source: source)
+        for projection in [Projection.epsg4978, Projection.noSRID] {
+            let source = source(srid: projection)
+            #expect(throws: MVTPostgisError.unsupportedSRID) {
+                try MVTPostgis(source: source)
+            }
         }
     }
 
     @Test
-    func `accepts mixed supported layer projections`() throws {
+    func `accepts mixed planar and geographic layer projections`() throws {
         let source = PostgisSource(
             name: "Mixed",
             layers: [
                 PostgisLayer(id: "first", datasource: datasource(srid: .epsg4326)),
                 PostgisLayer(id: "second", datasource: datasource(srid: .epsg3857)),
+                PostgisLayer(id: "third", datasource: datasource(srid: .epsg32633)),
             ])
 
         let postgis = try MVTPostgis(source: source)

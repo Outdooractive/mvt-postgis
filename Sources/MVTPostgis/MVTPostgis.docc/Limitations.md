@@ -2,8 +2,10 @@
 
 ## Supported projections
 
-PostGIS layers must use EPSG:4326 or EPSG:3857. `noSRID` and EPSG:4978 are
-rejected with ``MVTPostgisError/unsupportedSRID``.
+PostGIS layers must use a planar or geographic projection registered in
+GISTools (for example EPSG:4326, EPSG:3857, or a UTM zone). Geocentric
+projections such as EPSG:4978 and `noSRID` are rejected with
+``MVTPostgisError/unsupportedSRID``.
 
 ## SQL is trusted configuration
 
@@ -13,10 +15,10 @@ expression. Treat source files as trusted configuration.
 
 ## Simplification units
 
-Simplification tolerances are configured in metres. For EPSG:3857 they are
-passed to PostGIS unchanged. For EPSG:4326 they are converted to degrees with
-the spherical metres-per-degree constant; longitude distortion at high
-latitudes makes that conversion approximate.
+Simplification tolerances are configured in metres. For planar projections
+they are passed to PostGIS unchanged. For geographic projections they are
+converted to degrees with the spherical metres-per-degree constant; longitude
+distortion at high latitudes makes that conversion approximate.
 
 ## MVT and MLT are lossy
 

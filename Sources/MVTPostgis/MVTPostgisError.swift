@@ -16,9 +16,10 @@ public enum MVTPostgisError: Error, Equatable, Sendable {
     case tileOutOfBounds
     /// The tile timed out, i.e. not all queries return in time.
     case tileTimedOut(queries: [String])
-    /// This library only supports EPSG:3857 and EPSG:4326.
+    /// The datasource uses an unsupported projection. Only planar or
+    /// geographic projections with an SRID are supported.
     case unsupportedSRID
-    /// This library only supports EPSG:3857 and EPSG:4326.
+    /// The Mapnik SRS string could not be mapped to a registered projection.
     case unsupportedSRS
     /// All datasources must be of type "postgis".
     case wrongDatasourceType(message: String)

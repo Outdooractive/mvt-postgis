@@ -45,6 +45,7 @@ This project builds on several libraries that handle the heavy lifting:
 - **Cancellation support** — tile creation can be cancelled mid-flight via `Task.cancel()`
 - **Per-zoom configuration** — clipping, simplification, and validation strategies can vary by zoom level
 - **Mapnik compatibility** — follows the Mapnik PostGIS datasource conventions for layer definitions, extent calculations, and scale denominators
+- **Flexible projections** — every layer can use any planar or geographic CRS registered in GISTools; features are reprojected into the tile CRS
 
 ## Usage
 
@@ -207,7 +208,7 @@ The JSON format mirrors the `PostgisSource` → `PostgisLayer` → `PostgisDatas
 | `layers[].datasource.databaseName` | string | Database name |
 | `layers[].datasource.geometryField` | string? | Geometry column name (default: `"geometry"`) |
 | `layers[].datasource.boundingBox` | [minLon, minLat, maxLon, maxLat]? | Datasource extent |
-| `layers[].datasource.srid` | integer | SRID (4326 or 3857) |
+| `layers[].datasource.srid` | integer | Any planar or geographic SRID registered in GISTools (geocentric/`noSRID` rejected) |
 | `layers[].datasource.type` | string | Must be `"postgis"` |
 | `layers[].datasource.sql` | string | SQL query with `!bbox!` placeholder |
 
