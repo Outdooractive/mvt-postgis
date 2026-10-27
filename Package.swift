@@ -11,8 +11,10 @@ let package = Package(
         .library(name: "MVTPostgis", targets: ["MVTPostgis"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/Outdooractive/mvt-tools", from: "3.0.0", traits: ["EnableMLT"]),
-        .package(url: "https://github.com/Outdooractive/gis-tools", from: "2.5.0"),
+        // mvt-tools 3.0.0 still restricts gis-tools to the 2.x line. Pin main
+        // until a tagged mvt-tools release uses the gis-tools 3.0 beta line.
+        .package(url: "https://github.com/Outdooractive/mvt-tools", revision: "43e51601083fc91cdbcb1b6a1949075c17dc9e1c", traits: ["EnableMLT"]),
+        .package(url: "https://github.com/Outdooractive/gis-tools", exact: "3.0.0-beta.5"),
         .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "1.0.0"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.2"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.16.2"),

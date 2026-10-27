@@ -20,9 +20,11 @@ and this project adheres to semantic versioning.
 
 ### Changed
 
-- Updated to `mvt-tools` 3.0.0 (with the MLT trait), `gis-tools` 2.5.x,
-  `postgres-nio` 1.33.2, and direct `swift-log` and `swift-atomics`
-  dependencies. Removed the unused direct `swift-collections` dependency.
+- Updated to `gis-tools` 3.0.0-beta.5, `gis-tools-csv` 3.0.0-beta.6 and
+  `postgres-nio` 1.33.2. `mvt-tools` is pinned to the current `main` revision
+  because the 3.0.0 tag still restricts `gis-tools` to the 2.x line.
+- Added direct `swift-log` and `swift-atomics` dependencies and removed the
+  unused direct `swift-collections` dependency.
 - Layers may use EPSG:4326 or EPSG:3857 independently; features are reprojected
   into the tile projection when appended.
 - JSON, YML and XML source readers now use defaults for optional metadata,
