@@ -134,10 +134,15 @@ the failure is surfaced to the caller instead of crashing the process.
 
 ## Geometry collections
 
-MVT and MLT have no geometry-collection type. `GeometryCollection` features are
-kept in the in-memory `VectorTile` but dropped when encoding MVT or MLT. Split
-collections in SQL (for example with `ST_CollectionExtract` or `ST_Dump`) if
-they need to reach a tile consumer.
+MVT and MLT have no geometry-collection type. By default `GeometryCollection`
+features are kept in the in-memory `VectorTile` but dropped when encoding MVT or
+MLT.
+
+Set `MVTPostgisConfiguration.flattenGeometryCollections` to `true` to turn every
+collection member into a separate feature before clipping and encoding. Nested
+collections are flattened recursively. Each resulting feature keeps the original
+properties, foreign members and ID, so IDs can be duplicated. Alternatively,
+split collections in SQL with `ST_CollectionExtract` or `ST_Dump`.
 
 ## Multi-geometry round trips
 

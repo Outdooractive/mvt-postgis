@@ -741,27 +741,32 @@ public final class MVTPostgis: Sendable {
                         feature = featureMapping(feature)
                     }
 
-                    if let clipBounds, let simplificationTolerance {
-                        guard let clippedFeature = feature.clipped(to: clipBounds) else {
-                            invalidFeatures.set(invalidFeatures.item + 1)
-                            continue
+                    let pendingFeatures = self.configuration.flattenGeometryCollections
+                        ? Self.flattenedFeatures(from: feature)
+                        : [feature]
+
+                    for var candidate in pendingFeatures {
+                        if let clipBounds, let simplificationTolerance {
+                            guard let clippedFeature = candidate.clipped(to: clipBounds) else {
+                                invalidFeatures.set(invalidFeatures.item + 1)
+                                continue
+                            }
+
+                            candidate = clippedFeature.simplified(tolerance: simplificationTolerance)
+                        }
+                        else if let clipBounds {
+                            guard let clippedFeature = candidate.clipped(to: clipBounds) else {
+                                invalidFeatures.set(invalidFeatures.item + 1)
+                                continue
+                            }
+
+                            candidate = clippedFeature
+                        }
+                        else if let simplificationTolerance {
+                            candidate = candidate.simplified(tolerance: simplificationTolerance)
                         }
 
-                        features.append(clippedFeature.simplified(tolerance: simplificationTolerance))
-                    }
-                    else if let clipBounds {
-                        guard let clippedFeature = feature.clipped(to: clipBounds) else {
-                            invalidFeatures.set(invalidFeatures.item + 1)
-                            continue
-                        }
-
-                        features.append(clippedFeature)
-                    }
-                    else if let simplificationTolerance {
-                        features.append(feature.simplified(tolerance: simplificationTolerance))
-                    }
-                    else {
-                        features.append(feature)
+                        features.append(candidate)
                     }
                 }
 
@@ -776,6 +781,25 @@ public final class MVTPostgis: Sendable {
 
         // Features will be projected to EPSG:4326
         return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes.item, features: features.count, invalidFeatures: invalidFeatures.item, sqlQuery: query))
+    }
+
+    /// Expands a GeometryCollection into one feature per member, recursively.
+    /// Every flattened feature keeps the original ID, properties and foreign
+    /// members, so duplicates are possible when IDs are present.
+    private static func flattenedFeatures(from feature: Feature) -> [Feature] {
+        guard let collection = feature.geometry as? GeometryCollection else {
+            return [feature]
+        }
+
+        return collection.geometries.flatMap { geometry in
+            var child = Feature(
+                geometry,
+                id: feature.id,
+                properties: feature.properties)
+            child.foreignMembers = feature.foreignMembers
+
+            return flattenedFeatures(from: child)
+        }
     }
 
     // MARK: - Property decoding
