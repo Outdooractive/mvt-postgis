@@ -103,6 +103,28 @@ Empty geometries load as empty geometries; an empty `Point` loads as an empty
 `MultiPoint`. All empty geometries are dropped when encoding MVT or MLT because
 neither format has an empty geometry type.
 
+## SRIDs
+
+Every row's geometry must use the SRID declared by the datasource. The loader
+selects `ST_SRID(...)` alongside the WKB and skips rows whose SRID differs; they
+are counted in `invalidFeatures`. This prevents plain WKB, which carries no
+SRID, from being interpreted in the wrong coordinate system. A `NULL` geometry
+is skipped without being counted as invalid.
+
+## Clipping at tile boundaries
+
+Local clipping uses strict containment, so points exactly on the tile boundary
+and points outside the tile are dropped. PostGIS clipping (`ST_ClipByBox2D`)
+turns boundary and outside points into empty geometries; those empty features
+remain in the in-memory tile and are dropped by the MVT/MLT encoders.
+
+## Geometry columns
+
+The configured geometry field must exist in the result set and contain a
+geometry or geography value. A missing column, a non-castable column or an
+ambiguous duplicate column name fails the layer query with a Postgres error;
+the failure is surfaced to the caller instead of crashing the process.
+
 ## Geometry collections
 
 MVT and MLT have no geometry-collection type. `GeometryCollection` features are

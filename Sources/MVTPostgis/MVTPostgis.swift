@@ -510,6 +510,7 @@ public final class MVTPostgis: Sendable {
         let invalidFeatures = ThreadSafeObjectCollector<Int>(0)
 
         let geometryColumn = layer.datasource.geometryField?.nilIfEmpty ?? "geometry"
+        let sridColumn = PostgisQueryBuilder.sridColumnName
         try await poolDistributor.connection(
             forLayer: layer,
             batchId: batchId,
@@ -528,18 +529,30 @@ public final class MVTPostgis: Sendable {
                 for try await serialRow in rowSequence {
                     let row = serialRow.makeRandomAccess()
 
-                    guard row.contains(geometryColumn) else {
-                        // TODO: Throw error or find a suitable column
-                        logger.warning("\(externalName ?? source.name): Couldn't find the geometry column '\(geometryColumn)' in layer \(layer.id)")
-                        break
+                    guard row.contains(geometryColumn), row.contains(sridColumn) else {
+                        throw MVTPostgisError.missingGeometryColumn(
+                            layer: layer.id,
+                            column: geometryColumn)
                     }
                     guard let geometryBytes = row[data: geometryColumn].value else { continue }
+
+                    // A row whose SRID differs from the datasource SRID cannot
+                    // be decoded safely: the WKB carries no SRID, so it would
+                    // be interpreted in the wrong coordinate system.
+                    guard let rowSrid = row[data: sridColumn].int,
+                          rowSrid == projection.srid
+                    else {
+                        invalidFeatures.set(invalidFeatures.item + 1)
+                        continue
+                    }
 
                     let geometryData = Data(buffer: geometryBytes)
 
                     var properties: [String: Sendable] = [:]
                     for field in row {
-                        guard field.columnName != geometryColumn else { continue }
+                        guard field.columnName != geometryColumn,
+                              field.columnName != sridColumn
+                        else { continue }
 
                         let data = row[data: field.columnName]
 

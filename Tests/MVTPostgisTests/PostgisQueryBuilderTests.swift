@@ -40,7 +40,7 @@ struct PostgisQueryBuilderTests {
             validation: .none)
 
         #expect(builder.query == """
-        SELECT "name","weird""column",ST_AsBinary(ST_ClipByBox2D(ST_Force2D("geometry"::geometry),ENVELOPE)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT "name","weird""column",ST_AsBinary(ST_ClipByBox2D(ST_Force2D("geometry"::geometry),ENVELOPE)) AS "geometry",ST_SRID("geometry") AS "__mvt_postgis_srid" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -56,7 +56,7 @@ struct PostgisQueryBuilderTests {
 
         #expect(builder.usesLocalSimplification)
         #expect(builder.query == """
-        SELECT "name",ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT "name",ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry",ST_SRID("geometry") AS "__mvt_postgis_srid" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -124,7 +124,7 @@ struct PostgisQueryBuilderTests {
             validation: .none)
 
         #expect(builder.query == """
-        SELECT ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry",ST_SRID("geometry") AS "__mvt_postgis_srid" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -148,6 +148,7 @@ struct PostgisQueryBuilderTests {
             validation: .none)
 
         #expect(builder.query.contains("ST_AsBinary(ST_Force2D(\"shape\"::geometry)) AS \"shape\""))
+        #expect(builder.query.contains("ST_SRID(\"shape\") AS \"__mvt_postgis_srid\""))
     }
 
     @Test
