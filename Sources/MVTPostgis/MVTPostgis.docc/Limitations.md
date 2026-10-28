@@ -159,6 +159,13 @@ routing are the responsibility of the consuming application.
 whole tile. A timed-out tile is reported as
 ``MVTPostgisError/tileTimedOut(queries:)``.
 
+## Pool shutdown and concurrency
+
+`shutdown()` closes all pools. Requests that are already in flight fail, and a
+later request creates a fresh pool. Concurrent tiles share one pool per
+database key; `poolSize` limits the number of open connections and additional
+requests wait for a free connection.
+
 ## Database availability
 
 Transient database failures fail the current request and keep the pool alive;
