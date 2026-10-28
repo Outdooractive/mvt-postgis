@@ -49,6 +49,9 @@ and this project adheres to semantic versioning.
   deterministic decoded results.
 - Seeded generative tests for WKB and MVT/MLT invariants, malformed WKB and
   source documents, and arbitrary SQL fragments.
+- `MVTPostgisConfiguration.flattenGeometryCollections` flattens nested
+  `GeometryCollection`s into one feature per member before clipping and
+  encoding, preserving their properties, foreign members and IDs.
 
 ### Changed
 

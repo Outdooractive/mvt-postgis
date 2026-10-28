@@ -40,6 +40,12 @@ public struct MVTPostgisConfiguration: Sendable {
     /// Track SQL runtimes and return them together with the vector tile (default: false).
     public let trackRuntimes: Bool
 
+    /// Flatten `GeometryCollection` features into one feature per member before
+    /// clipping/simplification and encoding (default: false). MVT and MLT have
+    /// no geometry-collection type, so collections are otherwise dropped by the
+    /// encoders.
+    public let flattenGeometryCollections: Bool
+
     /// Creates a configuration with the given settings.
     ///
     /// All timeouts and pool sizes are clamped to sensible minimum values.
@@ -56,6 +62,7 @@ public struct MVTPostgisConfiguration: Sendable {
     ///   - validation: Closure returning the geometry validation strategy per zoom level.
     ///   - featureMapping: Optional closure to transform features after creation.
     ///   - trackRuntimes: When `true`, per-layer query runtimes are tracked and returned with each tile.
+    ///   - flattenGeometryCollections: When `true`, every member of a `GeometryCollection` becomes a separate feature with the same ID and properties.
     public init(
         applicationName: String = "MVTPostgis",
         connectTimeout: TimeInterval = 5.0,
@@ -68,6 +75,7 @@ public struct MVTPostgisConfiguration: Sendable {
         validation: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
         featureMapping: (@Sendable (_ feature: Feature) -> Feature)? = nil,
         trackRuntimes: Bool = false,
+        flattenGeometryCollections: Bool = false,
     ) {
         self.applicationName = applicationName
         self.connectTimeout = connectTimeout.atLeast(1.0)
@@ -80,6 +88,7 @@ public struct MVTPostgisConfiguration: Sendable {
         self.validation = validation
         self.featureMapping = featureMapping
         self.trackRuntimes = trackRuntimes
+        self.flattenGeometryCollections = flattenGeometryCollections
     }
 
 }
