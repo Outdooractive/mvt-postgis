@@ -116,7 +116,14 @@ final class IntegrationFixture {
 
     static func create() async throws -> IntegrationFixture {
         let database = try await IntegrationDatabase.connect()
+        let lockKey = 42_424_242
+
         do {
+            // Parallel suites can otherwise race on `CREATE EXTENSION IF NOT
+            // EXISTS postgis`, which is not atomic. Serialize fixture setup
+            // with a session-level advisory lock.
+            try await database.execute("SELECT pg_advisory_lock(\(lockKey))")
+
             try await database.execute("CREATE EXTENSION IF NOT EXISTS postgis")
 
             let schema = "mvt_test_\(UUID().uuidString.replacing("-", with: ""))"
@@ -130,9 +137,11 @@ final class IntegrationFixture {
                 .replacing("{{schema}}", with: schema)
             try await database.executeScript(sql)
 
+            try await database.execute("SELECT pg_advisory_unlock(\(lockKey))")
             return IntegrationFixture(database: database, schema: schema)
         }
         catch {
+            _ = try? await database.execute("SELECT pg_advisory_unlock(\(lockKey))")
             await database.close()
             throw error
         }
@@ -168,6 +177,8 @@ final class IntegrationFixture {
         fields: [String: String],
         srid: Projection,
         geometryField: String = "geom",
+        boundingBox: BoundingBox? = nil,
+        properties: PostgisLayer.Properties = PostgisLayer.Properties(),
         sql: String? = nil,
     ) -> PostgisLayer {
         let datasource = PostgisDatasource(
@@ -177,6 +188,7 @@ final class IntegrationFixture {
             port: IntegrationEnvironment.port,
             databaseName: IntegrationEnvironment.databaseName,
             geometryField: geometryField,
+            boundingBox: boundingBox,
             srid: srid,
             type: "postgis",
             sql: sql ?? """
@@ -185,6 +197,7 @@ final class IntegrationFixture {
         return PostgisLayer(
             id: id ?? table,
             fields: fields,
+            properties: properties,
             datasource: datasource)
     }
 
