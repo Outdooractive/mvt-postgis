@@ -3,12 +3,13 @@ import Foundation
 extension Array {
 
     var isNotEmpty: Bool {
-        !isEmpty
+        isEmpty == false
     }
 
     /// Adds a new element at the end of the array, if it's not nil.
     mutating func append(ifNotNil newElement: Element?) {
         guard let element = newElement else { return }
+
         append(element)
     }
 

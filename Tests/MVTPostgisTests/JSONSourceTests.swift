@@ -51,7 +51,7 @@ struct JSONSourceTests {
     """
 
     @Test
-    func JSONSource() async throws {
+    func `JSON source`() throws {
         let data = try #require(JSONSourceTests.jsonSource.data(using: .utf8))
         let source = try PostgisSource.load(from: data, layerAllowlist: nil)
 
@@ -88,7 +88,7 @@ struct JSONSourceTests {
     }
 
     @Test
-    func JSONSourceWithoutBoundingBox() async throws {
+    func `JSON source without bounding box`() throws {
         let json = """
         {
           "name": "No BBox Source",
