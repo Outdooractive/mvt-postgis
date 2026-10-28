@@ -96,6 +96,16 @@ final class IntegrationDatabase {
         return row.makeRandomAccess()[data: "value"].int
     }
 
+    /// Runs a query returning a single binary column aliased as `value`.
+    func queryData(_ sql: String) async throws -> Data? {
+        let rows = try await connection.simpleQuery(sql).get()
+        guard let row = rows.first,
+              let buffer = row.makeRandomAccess()[data: "value"].value
+        else { return nil }
+
+        return Data(buffer: buffer)
+    }
+
     func close() async {
         try? await connection.close().get()
         try? await group.shutdownGracefully()

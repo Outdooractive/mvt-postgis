@@ -54,6 +54,8 @@ and this project adheres to semantic versioning.
   encoding, preserving their properties, foreign members and IDs.
 - Coverage for administrative backend termination followed by an explicit
   `shutdown()` and pool recreation.
+- Differential feature-content test against PostGIS `ST_AsMVT` for a
+  representative tile.
 
 ### Changed
 
