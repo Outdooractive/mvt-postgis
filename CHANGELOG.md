@@ -24,6 +24,10 @@ and this project adheres to semantic versioning.
   and nested `GeometryCollection`s, empty variants, `Z`/`M`/`ZM` variants,
   curved geometries, `Triangle`, `TIN` and `PolyhedralSurface`, including MVT
   and MLT round-trip assertions.
+- Native decoding for curved geometries, `TIN`, `PolyhedralSurface` and empty
+  points through `gis-tools` 3.0.0-beta.6. Curves load as their linearized
+  types, `TIN`/`PolyhedralSurface` as `MultiPolygon`, and `POINT EMPTY` as an
+  empty `MultiPoint`; SQL conversions are no longer required.
 - A deterministic PostGIS integration suite with checked-in SQL fixtures,
   Docker/CI database setup, fake-loader pipeline tests, and a 90% coverage gate.
 - Public initializers for `PostgisSource`, `PostgisLayer`,
@@ -46,8 +50,8 @@ and this project adheres to semantic versioning.
 - Updated `PostgresConnectionPool` to 1.1.1. A connection that finishes
   opening while a pool is shutting down is now closed and discarded instead of
   leaking and trapping in PostgresNIO on release.
-- Updated to `mvt-tools` 3.0.0-beta.5, `gis-tools` 3.0.0-beta.5,
-  `gis-tools-csv` 3.0.0-beta.6 and `postgres-nio` 1.33.2.
+- Updated to `mvt-tools` 3.0.0-beta.6, `gis-tools` 3.0.0-beta.6,
+  `gis-tools-csv` 3.0.0-beta.7 and `postgres-nio` 1.33.2.
 - Added direct `swift-log` and `swift-atomics` dependencies and removed the
   unused direct `swift-collections` dependency.
 - Layers may use any planar or geographic projection registered in GISTools;

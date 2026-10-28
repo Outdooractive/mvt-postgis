@@ -895,8 +895,9 @@ struct PostGISIntegrationTests {
                 #expect(nested?.geometries.count == 2)
                 #expect(nested?.geometries.contains { $0 is GeometryCollection } == true)
 
-                #expect(feature("point_empty") == nil)
-                #expect(invalid("point_empty") == 1)
+                #expect(feature("point_empty")?.geometry is MultiPoint)
+                #expect((feature("point_empty")?.geometry as? MultiPoint)?.coordinates.isEmpty == true)
+                #expect(invalid("point_empty") == 0)
                 #expect((feature("linestring_empty")?.geometry as? LineString)?.coordinates.isEmpty == true)
                 #expect((feature("polygon_empty")?.geometry as? Polygon)?.coordinates.isEmpty == true)
                 #expect((feature("multipoint_empty")?.geometry as? MultiPoint)?.coordinates.isEmpty == true)
@@ -916,9 +917,16 @@ struct PostGISIntegrationTests {
 
                 #expect(feature("triangle")?.geometry is Polygon)
 
-                for name in ["circularstring", "compoundcurve", "curvepolygon", "multicurve", "multisurface", "tin", "polyhedralsurface"] {
-                    #expect(feature(name) == nil)
-                    #expect(invalid(name) == 1)
+                #expect(feature("circularstring")?.geometry is LineString)
+                #expect(feature("compoundcurve")?.geometry is LineString)
+                #expect(feature("curvepolygon")?.geometry is Polygon)
+                #expect(feature("multicurve")?.geometry is MultiLineString)
+                #expect(feature("multisurface")?.geometry is MultiPolygon)
+                #expect((feature("tin")?.geometry as? MultiPolygon)?.polygons.count == 1)
+                #expect((feature("polyhedralsurface")?.geometry as? MultiPolygon)?.polygons.count == 1)
+
+                for name in Self.ogcGeometryNames {
+                    #expect(invalid(name) == 0)
                 }
             }
         }
@@ -978,6 +986,12 @@ struct PostGISIntegrationTests {
             "multipolygon",
             "point_z",
             "triangle",
+            "circularstring",
+            "curvepolygon",
+            "multicurve",
+            "multisurface",
+            "tin",
+            "polyhedralsurface",
         ]
 
         try await IntegrationFixture.withFixture { fixture in
@@ -992,6 +1006,16 @@ struct PostGISIntegrationTests {
                 let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
                 let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
 
+                func isSinglePolygon(_ geometry: GeoJsonGeometry?) -> Bool {
+                    if let polygon = geometry as? Polygon {
+                        return polygon.coordinates.count == 1
+                    }
+                    if let multiPolygon = geometry as? MultiPolygon {
+                        return multiPolygon.polygons.count == 1
+                    }
+                    return false
+                }
+
                 for tile in [mvtTile, mltTile] {
                     #expect(tile.features(for: "point").first?.geometry is Point)
                     #expect((tile.features(for: "multipoint").first?.geometry as? MultiPoint)?.coordinates.count == 2)
@@ -1004,6 +1028,14 @@ struct PostGISIntegrationTests {
                     #expect(tile.features(for: "point_z").first?.geometry is Point)
                     #expect((tile.features(for: "point_z").first?.geometry as? Point)?.coordinate.altitude == nil)
                     #expect(tile.features(for: "triangle").first?.geometry is Polygon)
+                    #expect(tile.features(for: "circularstring").first?.geometry is LineString)
+                    #expect(tile.features(for: "curvepolygon").first?.geometry is Polygon)
+                    // Single-part multi-geometries may decode as their singular
+                    // type or stay a one-part multi-geometry.
+                    #expect(tile.features(for: "multicurve").first?.geometry is LineString)
+                    #expect(isSinglePolygon(tile.features(for: "multisurface").first?.geometry))
+                    #expect(isSinglePolygon(tile.features(for: "tin").first?.geometry))
+                    #expect(isSinglePolygon(tile.features(for: "polyhedralsurface").first?.geometry))
                 }
             }
         }
@@ -1086,6 +1118,7 @@ struct PostGISIntegrationTests {
             "collection_homogeneous",
             "collection_mixed",
             "collection_nested",
+            "point_empty",
             "linestring_empty",
             "polygon_empty",
             "multipoint_empty",

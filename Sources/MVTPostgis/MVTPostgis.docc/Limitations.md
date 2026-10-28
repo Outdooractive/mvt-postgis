@@ -77,27 +77,31 @@ altitude, GeoJSON `m` values, string feature IDs, or foreign members.
 
 ## Geometry types
 
-The query builder loads any PostGIS geometry value that GISTools can decode:
+The query builder loads every PostGIS geometry value that GISTools can decode:
 
 - `Point`, `MultiPoint`, `LineString`, `MultiLineString`
 - `Polygon` (with or without holes) and `MultiPolygon`
 - `GeometryCollection` with homogeneous, mixed or nested contents
 - `Triangle`, which is loaded as a `Polygon`
+- Curved geometries, which are linearized:
+  - `CircularString` and `CompoundCurve` become `LineString`
+  - `CurvePolygon` becomes `Polygon`
+  - `MultiCurve` becomes `MultiLineString`
+  - `MultiSurface` becomes `MultiPolygon`
+- `TIN` and `PolyhedralSurface`, which become `MultiPolygon` with one
+  `Polygon` per triangle or patch
 
-Curved geometries (`CircularString`, `CompoundCurve`, `CurvePolygon`,
-`MultiCurve`, `MultiSurface`), `TIN` and `PolyhedralSurface` cannot be decoded
-and are counted as invalid features. Convert curves in SQL with
-`ST_CurveToLine`; `TIN` and `PolyhedralSurface` have no MVT/MLT equivalent and
-must be converted to a flat geometry type before loading.
+Linearization is lossy. Re-encoding emits the linear geometry type; the
+original curve or surface type and TIN topology are not preserved.
 
 Geometries with `Z`, `M` or `ZM` coordinates are converted to 2D with
 `ST_Force2D` before WKB decoding, so they load normally but altitude and
 measure values are discarded. `geography` columns are cast to `geometry` first
 and load the same way. MVT and MLT do not carry `Z` or `M` values.
 
-Empty geometries load as empty geometries, except an empty `Point`, which is
-skipped as an invalid feature. Empty geometries are dropped when encoding MVT
-or MLT because neither format has an empty geometry type.
+Empty geometries load as empty geometries; an empty `Point` loads as an empty
+`MultiPoint`. All empty geometries are dropped when encoding MVT or MLT because
+neither format has an empty geometry type.
 
 ## Geometry collections
 
@@ -108,10 +112,12 @@ they need to reach a tile consumer.
 
 ## Multi-geometry round trips
 
-A single-part `MultiPoint` or `MultiLineString` may decode as `Point` or
-`LineString`; multi-part geometries are preserved. Polygon holes,
-`MultiPolygon`, and `Triangle` (which is loaded as `Polygon`) survive a round
-trip. Assert the decoded geometry type if your consumer depends on it.
+A single-part `MultiPoint`, `MultiLineString`, `MultiPolygon`, `MultiCurve`
+or `MultiSurface` may decode as its singular type. Multi-part geometries are
+preserved. Polygon holes, `MultiPolygon`, `Triangle`, `TIN` and
+`PolyhedralSurface` survive a round trip, and curves re-encode as their
+linearized type. Assert the decoded geometry type if your consumer depends on
+it.
 
 ## No HTTP server
 
