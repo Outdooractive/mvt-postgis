@@ -53,6 +53,8 @@ and this project adheres to semantic versioning.
   to an unsigned MVT ID.
 - CI and the local integration runner now use PostgreSQL 18 / PostGIS 3.6,
   the minimum supported production version.
+- Documented the PostgreSQL 18 / PostGIS 3.6 support matrix and added a
+  workflow-dispatch image override plus a weekly integration schedule.
 - Updated `PostgresConnectionPool` to 1.1.1. A connection that finishes
   opening while a pool is shutting down is now closed and discarded instead of
   leaking and trapping in PostgresNIO on release.
