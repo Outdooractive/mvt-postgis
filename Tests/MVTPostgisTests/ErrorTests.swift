@@ -10,55 +10,55 @@ struct MVTPostgisErrorTests {
     }
 
     @Test
-    func `connection failed`() {
+    func connectionFailed() {
         #expect(MVTPostgisError.connectionFailed.description == "Connection failed")
     }
 
     @Test
-    func `need layers`() {
+    func needLayers() {
         #expect(MVTPostgisError.needLayers.description == "Need layers")
     }
 
     @Test
-    func `invalid layer id`() {
+    func invalidLayerId() {
         #expect(MVTPostgisError.invalidLayerId.description == "Invalid layer id")
     }
 
     @Test
-    func `tile out of bounds`() {
+    func tileOutOfBounds() {
         #expect(MVTPostgisError.tileOutOfBounds.description == "Tile out of bounds")
     }
 
     @Test
-    func `tile timed out`() {
+    func tileTimedOut() {
         let error = MVTPostgisError.tileTimedOut(queries: ["SELECT 1"])
         #expect(error.description == "Tile timed out:\nQuery #1:\nSELECT 1")
     }
 
     @Test
-    func `unsupported SRID`() {
+    func unsupportedSrid() {
         #expect(MVTPostgisError.unsupportedSRID.description == "Unsupported SRID")
     }
 
     @Test
-    func `unsupported SRS`() {
+    func unsupportedSrs() {
         #expect(MVTPostgisError.unsupportedSRS.description == "Unsupported SRS")
     }
 
     @Test
-    func `wrong datasource type`() {
+    func wrongDatasourceType() {
         let error = MVTPostgisError.wrongDatasourceType(message: "test")
         #expect(error.description == "Wrong datasource type: test")
     }
 
     @Test
-    func `xml error`() {
+    func xmlError() {
         let error = MVTPostgisError.xmlError(message: "parse error")
         #expect(error.description == "XML error: parse error")
     }
 
     @Test
-    func `layer allowlist filters JSON`() throws {
+    func layerAllowlistFiltersJson() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -108,7 +108,7 @@ struct MVTPostgisErrorTests {
 struct PerformanceDataTests {
 
     @Test
-    func `stores all values`() {
+    func storesAllValues() {
         let data = MVTLayerPerformanceData(
             runtime: 1.5,
             wkbBytes: 42,

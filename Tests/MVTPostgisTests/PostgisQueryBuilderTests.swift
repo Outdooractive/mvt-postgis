@@ -25,7 +25,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `default clipping uses one clip call and excludes geometry field`() {
+    func defaultClippingUsesOneClipCallAndExcludesGeometryField() {
         let builder = PostgisQueryBuilder(
             layer: layer(fields: [
                 "name": "",
@@ -45,7 +45,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `local clipping and simplification stay in swift`() {
+    func localClippingAndSimplificationStayInSwift() {
         let builder = PostgisQueryBuilder(
             layer: layer(),
             envelope: "ENVELOPE",
@@ -61,7 +61,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `postgis simplification includes preserve collapsed`() {
+    func postgisSimplificationIncludesPreserveCollapsed() {
         let builder = PostgisQueryBuilder(
             layer: layer(),
             envelope: "ENVELOPE",
@@ -74,7 +74,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `meter simplification uses its own tolerance`() {
+    func meterSimplificationUsesItsOwnTolerance() {
         let builder = PostgisQueryBuilder(
             layer: layer(),
             envelope: "ENVELOPE",
@@ -87,7 +87,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `structure validation uses postgis arguments`() {
+    func structureValidationUsesPostgisArguments() {
         let builder = PostgisQueryBuilder(
             layer: layer(),
             envelope: "ENVELOPE",
@@ -100,7 +100,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `all postgis options nest correctly`() {
+    func allPostgisOptionsNestCorrectly() {
         let builder = PostgisQueryBuilder(
             layer: layer(),
             sql: "(SELECT geometry FROM places WHERE geometry && !bbox!) AS places",
@@ -114,7 +114,7 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `empty fields select only geometry`() {
+    func emptyFieldsSelectOnlyGeometry() {
         let builder = PostgisQueryBuilder(
             layer: layer(fields: [:]),
             envelope: "ENVELOPE",
@@ -129,13 +129,13 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
-    func `identifier quoting escapes embedded quotes`() {
+    func identifierQuotingEscapesEmbeddedQuotes() {
         #expect(PostgisQueryBuilder.quotedIdentifier("geometry") == "\"geometry\"")
         #expect(PostgisQueryBuilder.quotedIdentifier(#"a"b"#) == #""a""b""#)
     }
 
     @Test
-    func `simplification converts meters for geographic layers`() {
+    func simplificationConvertsMetersForGeographicLayers() {
         let geographicLayer = PostgisLayer(
             id: "layer",
             fields: [:],

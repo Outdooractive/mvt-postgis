@@ -1,11 +1,11 @@
 import Foundation
+import PostgresConnectionPool
+import PostgresNIO
 #if canImport(Glibc)
 import Glibc
 #elseif canImport(Darwin)
 import Darwin
 #endif
-import PostgresNIO
-import PostgresConnectionPool
 
 actor PoolDistributor {
 
@@ -27,27 +27,26 @@ actor PoolDistributor {
 
     func pool(forLayer layer: PostgisLayer) async -> PostgresConnectionPool {
         if let pool = pools[layer.uniqueDatabaseKey] {
-            // A pool that shut itself down (e.g. after a PostGIS restart was
-            // in progress when a connection was attempted — the pool treats
-            // connection errors as fatal) never recovers on its own: every
-            // later request would throw `poolDestroyed` forever.
-            if await !pool.isShutdown {
+            // A pool shuts itself down permanently after authentication, TLS
+            // or database-name errors, or when it was explicitly shut down.
+            // Such a pool never recovers on its own: every later request
+            // would throw `poolDestroyed` forever. Transient network and
+            // restart errors no longer destroy the pool.
+            if await pool.isShutdown == false {
                 return pool
             }
 
-            // The pool is dead. Recreating it allocates a new event loop
-            // group (one kqueue/epoll fd per thread), so recreation must be
-            // strictly bounded during an outage or the process dies with
-            // "Too many open files". Two guards:
+            // The pool is dead. Recreating it opens new connections and
+            // allocates a new pool actor, so recreation must be strictly
+            // bounded. Two guards:
             //
             // 1. While a recreation is already in flight (the actor is
             //    suspended in the probe or pool shutdown below), other
-            //    requests reuse the dead pool and fail fast (zero fd cost).
+            //    requests reuse the dead pool and fail fast (zero cost).
             // 2. Recreation only happens after a cheap TCP probe confirms
-            //    the database actually accepts connections again — probing
-            //    costs one socket, recreating blind costs an event loop
-            //    group per attempt. Fail-fast + succeed-on-next-probe means
-            //    an outage produces at most one pool per reachability flip.
+            //    the database actually accepts connections again. Fail-fast
+            //    plus succeed-on-next-probe means a permanent failure
+            //    produces at most one pool per reachability flip.
             let key = layer.uniqueDatabaseKey
             if recreating.contains(key) {
                 return pool
@@ -60,9 +59,9 @@ actor PoolDistributor {
                 port: layer.datasource.port,
                 timeout: configuration.connectTimeout)
             guard reachable else {
-                // Database still down. Keep the (already fully shut down)
-                // pool; requests fail fast with `poolDestroyed` until the
-                // next probe succeeds.
+                // Database still unreachable. Keep the (already fully shut
+                // down) pool; requests fail fast with `poolDestroyed` until
+                // the next probe succeeds.
                 logger.info("Database '\(key)' is unreachable, not recreating its pool yet")
                 return pool
             }
@@ -102,21 +101,21 @@ actor PoolDistributor {
     func connection(
         forLayer layer: PostgisLayer,
         batchId: Int,
-        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void
+        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void,
     ) async throws {
-        // The pool can shut itself down at any moment (database outage —
-        // connection errors are treated as fatal by `PostgresConnectionPool`
-        // and permanently disable it). One retry through `pool(forLayer:)`
-        // covers a race where the pool dies after being fetched: that
-        // method detects the shut-down pool, probes the database, and
-        // rebuilds the pool once it is reachable again.
+        // A pool can shut itself down after a permanent connection error
+        // (authentication, TLS or database name) or an explicit shutdown.
+        // Transient failures fail the request but leave the pool alive. One
+        // retry through `pool(forLayer:)` covers a race where a pool dies
+        // after being fetched: that method detects the shut-down pool,
+        // probes the database, and rebuilds it once it is reachable again.
         do {
-            try await self.connectionOnce(forLayer: layer, batchId: batchId, callback: callback)
+            try await connectionOnce(forLayer: layer, batchId: batchId, callback: callback)
         }
         catch PoolError.poolDestroyed {
-            logger.warning("Layer '\(layer.id)': Connection pool was destroyed (database outage?), retrying once with a new pool")
+            logger.warning("Layer '\(layer.id)': Connection pool was destroyed (permanent connection error?), retrying once with a new pool")
 
-            try await self.connectionOnce(forLayer: layer, batchId: batchId, callback: callback)
+            try await connectionOnce(forLayer: layer, batchId: batchId, callback: callback)
 
             if Task.isCancelled {
                 await abortBatch(batchId)
@@ -129,7 +128,7 @@ actor PoolDistributor {
     private func connectionOnce(
         forLayer layer: PostgisLayer,
         batchId: Int,
-        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void
+        callback: @Sendable (PostgresConnectionWrapper) async throws -> Void,
     ) async throws {
         let pool = await pool(forLayer: layer)
 
@@ -190,20 +189,20 @@ actor PoolDistributor {
     /// Cheap TCP connectivity check used before recreating a shut-down pool.
     ///
     /// A probe allocates exactly one socket that is closed immediately —
-    /// orders of magnitude cheaper than constructing a pool (whose event
-    /// loop group alone holds one kqueue/epoll fd per thread), so an outage
-    /// can never exhaust file descriptors here. The probe uses a plain
+    /// orders of magnitude cheaper than constructing a pool with new
+    /// connections and pool state. The probe uses a plain
     /// POSIX socket: `getaddrinfo` + non-blocking `connect` + `poll` for
     /// writability, then `SO_ERROR` to distinguish success from failure.
     static func isReachable(
         host: String,
         port: Int,
-        timeout: TimeInterval
+        timeout: TimeInterval,
     ) async -> Bool {
         // SOCK_STREAM is a plain `Int32` on Darwin but a packed enum value on
         // Glibc — normalize via the platform shim.
         let descriptor = socket(AF_INET, Platform.streamSocketType, 0)
         guard descriptor >= 0 else { return false }
+
         defer { close(descriptor) }
 
         // Non-blocking connect + poll for writability (or error).
@@ -219,6 +218,7 @@ actor PoolDistributor {
         guard getaddrinfo(host, String(port), &hints, &result) == 0, let first = result else {
             return false
         }
+
         defer { freeaddrinfo(result) }
 
         // `ai_addr` points into the allocated list — keep `first` alive and
@@ -285,7 +285,7 @@ private enum Platform {
     static func poll(
         _ fds: UnsafeMutablePointer<pollfd>,
         _ nfds: nfds_t,
-        _ timeout: Int32
+        _ timeout: Int32,
     ) -> Int32 {
         #if canImport(Glibc)
         return Glibc.poll(fds, nfds, timeout)
@@ -296,14 +296,14 @@ private enum Platform {
 
 }
 
-fileprivate extension PostgisLayer {
+extension PostgisLayer {
 
-    var uniqueDatabaseKey: String {
+    fileprivate var uniqueDatabaseKey: String {
         [
             datasource.host,
             String(datasource.port),
             datasource.user,
-            datasource.databaseName
+            datasource.databaseName,
         ].joined(separator: ",")
     }
 

@@ -1,14 +1,14 @@
 import Foundation
-#if canImport(Glibc)
-import Glibc
-#elseif canImport(Darwin)
-import Darwin
-#endif
 import GISTools
 import Logging
 @testable import MVTPostgis
 import PostgresConnectionPool
 import Testing
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 struct PoolDistributorTests {
 
@@ -51,7 +51,7 @@ struct PoolDistributorTests {
         await distributor.abortBatch(42)
     }
 
-    // MARK: - Pool recreation after a database outage
+    // MARK: - Pool recreation after a permanent failure
 
     /// A minimal layer pointing at a closed localhost port — connect always
     /// fails with ECONNREFUSED, which is all these tests need: the pool fails
@@ -98,10 +98,10 @@ struct PoolDistributorTests {
 
         // First call creates and caches a pool.
         let pool1 = await distributor.pool(forLayer: layer)
-        #expect(await !pool1.isShutdown)
+        #expect(await pool1.isShutdown == false)
 
-        // Simulate a database outage: the pool shuts itself down on fatal
-        // connection errors.
+        // Simulate a permanently destroyed pool (e.g. an authentication
+        // failure or an explicit shutdown).
         await pool1.shutdown()
         let info = await pool1.poolInfo()
         #expect(info.isShutdown)
@@ -110,7 +110,7 @@ struct PoolDistributorTests {
         // the still-listening port succeeds, so the distributor builds a
         // fresh pool.
         let pool2 = await distributor.pool(forLayer: layer)
-        #expect(await !pool2.isShutdown)
+        #expect(await pool2.isShutdown == false)
         #expect(pool2 !== pool1)
 
         await distributor.shutdown()
@@ -124,8 +124,8 @@ struct PoolDistributorTests {
         let distributor = PoolDistributor(configuration: config, logger: logger)
 
         // Port 1 on localhost is closed — the probe fails, so the dead pool
-        // is kept and every request fails fast (this is what bounds the file
-        // descriptor usage during a real outage).
+        // is kept and every request fails fast (this bounds pool/connection
+        // churn while the database is unreachable).
         let pool1 = await distributor.pool(forLayer: Self.unreachableLayer)
         await pool1.shutdown()
 
@@ -138,11 +138,10 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func requestStormDuringOutageNeverRecreates() async throws {
-        // Regression test for the production crash: ~40 blind recreations
-        // during an outage exhausted the file descriptors (each pool owns an
-        // event loop group with one fd per thread). With the probe gate, a
-        // storm of concurrent requests against an unreachable database must
+    func requestStormDuringOutageNeverRecreates() async {
+        // Regression test for a production crash where blind recreations
+        // created too many pools/connections. With the probe gate, a storm
+        // of concurrent requests against an unreachable database must
         // observe exactly ONE pool identity — the dead one — and never
         // allocate a new pool while the database is down.
         let config = MVTPostgisConfiguration()
@@ -197,28 +196,28 @@ struct PoolDistributorTests {
         var logger = Logger(label: "test")
         logger.logLevel = .critical
 
-        // A live TCP port: the probe succeeds, so the distributor recreates
-        // the pool, and the retry throws a *real* connection error (nothing
-        // speaks Postgres) instead of `poolDestroyed` forever.
+        // A live TCP port: nothing speaks Postgres there, so the request
+        // fails with a transient connection error. The pool itself remains
+        // alive.
         let listener = try? LocalListener()
         let layer = listener.map { Self.localListenerLayer(port: $0.port) } ?? Self.unreachableLayer
         defer { listener?.close() }
 
         let distributor = PoolDistributor(configuration: MVTPostgisConfiguration(), logger: logger)
 
-        // First attempt: fails (nothing speaks Postgres on that port), and
-        // the pool will eventually shut itself down due to the error.
+        // First attempt: fails because nothing speaks Postgres on that port.
+        // A transient failure does not shut the pool down.
         do {
             try await distributor.connection(forLayer: layer, batchId: 1) { _ in }
         }
         catch {
-            // Expected — connection refused / timeout / pool destroyed.
+            // Expected — transient connection failure.
         }
 
         // Whatever happened to the first pool, a later request must get a
         // usable (not shut-down) pool.
         let pool = await distributor.pool(forLayer: layer)
-        #expect(await !pool.isShutdown)
+        #expect(await pool.isShutdown == false)
 
         await distributor.shutdown()
     }
@@ -240,7 +239,7 @@ struct PoolDistributorTests {
             host: "127.0.0.1",
             port: 1,
             timeout: 0.5)
-        #expect(!closed)
+        #expect(closed == false)
     }
 
 }
@@ -248,14 +247,17 @@ struct PoolDistributorTests {
 // MARK: - Local TCP listener helper
 
 private enum ListenerError: Error {
+
     case couldNotCreateSocket
     case couldNotBind
+
 }
 
 /// A bound+listening TCP socket on an ephemeral localhost port. Used as the
 /// reachability probe target; nothing speaks Postgres on it, which is fine —
 /// the probe checks TCP connectability only.
 private final class LocalListener {
+
     let descriptor: Int32
     let port: Int
 
@@ -266,7 +268,7 @@ private final class LocalListener {
         var addr = sockaddr_in()
         addr.sin_family = sa_family_t(AF_INET)
         addr.sin_addr = in_addr(s_addr: INADDR_LOOPBACK.bigEndian)
-        addr.sin_port = 0  // let the OS pick a free port
+        addr.sin_port = 0 // let the OS pick a free port
 
         var bindResult: Int32 = -1
         withUnsafePointer(to: &addr) { pointer in
@@ -299,6 +301,7 @@ private final class LocalListener {
     func close() {
         Platform.close(descriptor)
     }
+
 }
 
 // MARK: - POSIX shims (Linux Glibc vs. macOS Darwin differences)
@@ -320,9 +323,9 @@ private enum Platform {
     /// already in the right representation; on Glibc it needs `.bigEndian`).
     static var loopbackAddress: in_addr_t {
         #if canImport(Glibc)
-        return INADDR_LOOPBACK.bigEndian
+        INADDR_LOOPBACK.bigEndian
         #else
-        return UInt32(INADDR_LOOPBACK).bigEndian
+        UInt32(INADDR_LOOPBACK).bigEndian
         #endif
     }
 

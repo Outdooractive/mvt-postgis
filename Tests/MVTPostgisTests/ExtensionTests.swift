@@ -7,7 +7,7 @@ struct ExtensionTests {
     // MARK: - Array
 
     @Test
-    func `array is not empty`() {
+    func arrayIsNotEmpty() {
         let empty: [Int] = []
         let nonEmpty = [1]
         #expect(empty.isNotEmpty == false)
@@ -15,7 +15,7 @@ struct ExtensionTests {
     }
 
     @Test
-    func `array append if not nil`() {
+    func arrayAppendIfNotNil() {
         var array = [1]
         array.append(ifNotNil: 2)
         #expect(array == [1, 2])
@@ -24,7 +24,7 @@ struct ExtensionTests {
     }
 
     @Test
-    func `array remove`() {
+    func arrayRemove() {
         var array = [1, 2, 3, 2]
         array.remove(2)
         #expect(array == [1, 3])
@@ -33,13 +33,13 @@ struct ExtensionTests {
     // MARK: - Data
 
     @Test
-    func `data UTF 8 string`() throws {
+    func dataUtf8String() throws {
         let data = try #require("hello".data(using: .utf8))
         #expect(data.asUTF8EncodedString == "hello")
     }
 
     @Test
-    func `data UTF 8 string invalid`() {
+    func dataUtf8StringInvalid() {
         let invalid = Data([0xFF, 0xFE])
         #expect(invalid.asUTF8EncodedString == nil)
     }
@@ -47,14 +47,14 @@ struct ExtensionTests {
     // MARK: - Dictionary
 
     @Test
-    func `dictionary has key`() {
+    func dictionaryHasKey() {
         let dict = ["a": 1]
         #expect(dict.hasKey("a"))
         #expect(dict.hasKey("b") == false)
     }
 
     @Test
-    func `dictionary is not empty`() {
+    func dictionaryIsNotEmpty() {
         let empty: [String: Int] = [:]
         let nonEmpty = ["a": 1]
         #expect(empty.isNotEmpty == false)
@@ -64,7 +64,7 @@ struct ExtensionTests {
     // MARK: - Double
 
     @Test
-    func `double at least`() {
+    func doubleAtLeast() {
         #expect(5.0.atLeast(3.0) == 5.0)
         #expect(1.0.atLeast(3.0) == 3.0)
         #expect((-5.0).atLeast(0.0) == 0.0)
@@ -73,14 +73,14 @@ struct ExtensionTests {
     // MARK: - FloatingPoint
 
     @Test
-    func `floating point round to places`() {
+    func floatingPointRoundToPlaces() {
         #expect(3.14159.rounded(toPlaces: 2) == 3.14)
         #expect(3.14159.rounded(toPlaces: 0) == 3.0)
         #expect(3.14159.rounded(toPlaces: 4) == 3.1416)
     }
 
     @Test
-    func `floating point mutating round`() {
+    func floatingPointMutatingRound() {
         var value = 3.14159
         value.round(toPlaces: 2)
         #expect(value == 3.14)
@@ -89,7 +89,7 @@ struct ExtensionTests {
     // MARK: - Int
 
     @Test
-    func `int at least`() {
+    func intAtLeast() {
         #expect(5.atLeast(3) == 5)
         #expect(1.atLeast(3) == 3)
         #expect((-5).atLeast(0) == 0)
@@ -98,26 +98,26 @@ struct ExtensionTests {
     // MARK: - String
 
     @Test
-    func `string is not empty`() {
+    func stringIsNotEmpty() {
         #expect("".isNotEmpty == false)
         #expect("a".isNotEmpty)
     }
 
     @Test
-    func `string nil if empty`() {
+    func stringNilIfEmpty() {
         #expect("".nilIfEmpty == nil)
         #expect("a".nilIfEmpty == "a")
     }
 
     @Test
-    func `string to int`() {
+    func stringToInt() {
         #expect("42".toInt == 42)
         #expect("abc".toInt == nil)
         #expect("".toInt == nil)
     }
 
     @Test
-    func `string to double`() {
+    func stringToDouble() {
         #expect("3.14".toDouble == 3.14)
         #expect("abc".toDouble == nil)
     }
@@ -125,7 +125,7 @@ struct ExtensionTests {
     // MARK: - ThreadSafeArrayCollector
 
     @Test
-    func `thread safe array collector`() {
+    func threadSafeArrayCollector() {
         let collector = ThreadSafeArrayCollector<Int>()
         #expect(collector.isEmpty)
         #expect(collector.items == [])
@@ -137,7 +137,7 @@ struct ExtensionTests {
     }
 
     @Test
-    func `thread safe array collector with initial`() {
+    func threadSafeArrayCollectorWithInitial() {
         let collector = ThreadSafeArrayCollector<Int>([1, 2])
         #expect(collector.count == 2)
         collector.append(3)
@@ -147,7 +147,7 @@ struct ExtensionTests {
     // MARK: - ThreadSafeObjectCollector
 
     @Test
-    func `thread safe object collector`() {
+    func threadSafeObjectCollector() {
         let collector = ThreadSafeObjectCollector<Int>(0)
         #expect(collector.item == 0)
         collector.set(42)

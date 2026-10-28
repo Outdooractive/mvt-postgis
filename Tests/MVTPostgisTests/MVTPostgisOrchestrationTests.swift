@@ -33,7 +33,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `all layers skipped returns empty tile without connecting`() async throws {
+    func allLayersSkippedReturnsEmptyTileWithoutConnecting() async throws {
         let postgis = try makePostgis()
         let result = try await postgis.vectorTile(forTile: MapTile(x: 0, y: 0, z: 10))
 
@@ -46,7 +46,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `all layers skipped returns empty runtime map`() async throws {
+    func allLayersSkippedReturnsEmptyRuntimeMap() async throws {
         let postgis = try makePostgis(trackRuntimes: true)
         let result = try await postgis.vectorTile(forTile: MapTile(x: 0, y: 0, z: 10))
 
@@ -57,7 +57,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `skipped layers still produce MVT data`() async throws {
+    func skippedLayersStillProduceMvtData() async throws {
         let postgis = try makePostgis()
         let result = try await postgis.data(
             forTile: MapTile(x: 0, y: 0, z: 10),
@@ -71,7 +71,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `skipped layers produce MLT data`() async throws {
+    func skippedLayersProduceMltData() async throws {
         let postgis = try makePostgis()
         let result = try await postgis.data(
             forTile: MapTile(x: 0, y: 0, z: 10),
@@ -84,7 +84,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `validate returns connection error for unreachable database`() async throws {
+    func validateReturnsConnectionErrorForUnreachableDatabase() async throws {
         let datasource = PostgisDatasource(
             user: "u",
             host: "127.0.0.1",
@@ -112,7 +112,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `skipped layer with buffer still returns immediately`() async throws {
+    func skippedLayerWithBufferStillReturnsImmediately() async throws {
         let datasource = PostgisDatasource(
             user: "u",
             host: "127.0.0.1",
@@ -145,7 +145,7 @@ struct MVTPostgisOrchestrationTests {
     }
 
     @Test
-    func `skipped projected layer returns empty tile`() async throws {
+    func skippedProjectedLayerReturnsEmptyTile() async throws {
         let datasource = PostgisDatasource(
             user: "u",
             host: "127.0.0.1",

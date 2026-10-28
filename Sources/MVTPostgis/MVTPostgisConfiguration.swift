@@ -26,13 +26,13 @@ public struct MVTPostgisConfiguration: Sendable {
     public let maxIdleConnections: Int?
 
     /// Controls if and where the clipping of features happens.
-    public let clipping: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption)
+    public let clipping: @Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption
 
     /// Controls if and how much features are simplified.
-    public let simplification: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption)
+    public let simplification: @Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption
 
     /// Controls whether `ST_MakeValid` should be applied to each geometry.
-    public let validation: (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption)
+    public let validation: @Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption
 
     /// Allows to update `Feature`s directly after creation (i.e. before clipping/simplification)
     public let featureMapping: (@Sendable (_ feature: Feature) -> Feature)?
@@ -63,11 +63,11 @@ public struct MVTPostgisConfiguration: Sendable {
         tileTimeout: TimeInterval = 60.0,
         poolSize: Int = 10,
         maxIdleConnections: Int? = nil,
-        clipping: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _  in .postgis },
-        simplification: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _  in .none },
+        clipping: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTClippingOption) = { _, _ in .postgis },
+        simplification: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTSimplificationOption) = { _, _ in .none },
         validation: @escaping (@Sendable (_ zoom: Int, _ source: PostgisSource) -> MVTMakeValidOption) = { _, _ in .none },
         featureMapping: (@Sendable (_ feature: Feature) -> Feature)? = nil,
-        trackRuntimes: Bool = false
+        trackRuntimes: Bool = false,
     ) {
         self.applicationName = applicationName
         self.connectTimeout = connectTimeout.atLeast(1.0)

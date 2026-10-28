@@ -26,7 +26,7 @@ public struct MVTLayerPerformanceData: Sendable {
         wkbBytes: Int64,
         features: Int,
         invalidFeatures: Int,
-        sqlQuery: String
+        sqlQuery: String,
     ) {
         self.runtime = runtime
         self.wkbBytes = wkbBytes

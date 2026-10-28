@@ -29,7 +29,7 @@ public final class MVTPostgis: Sendable {
     /// Used when no explicit ``configuration`` is passed to the initializer.
     /// Changes after the first instance is created have no effect on existing instances.
     /// See ``MVTPostgisConfiguration``.
-    public nonisolated(unsafe) static var configuration: MVTPostgisConfiguration = .init()
+    nonisolated(unsafe) public static var configuration: MVTPostgisConfiguration = .init()
 
     private static let postgisDatasourceTypeCode = "postgis"
     private static let batchId: ManagedAtomic<Int> = .init(0)
@@ -58,6 +58,7 @@ public final class MVTPostgis: Sendable {
     private let logger: Logger
     private let poolDistributor: PoolDistributor
     private let customLayerLoader: LayerLoader?
+    private let customTypeOIDs = ThreadSafeObjectCollector<[String: Set<UInt32>]>([:])
 
     // MARK: -
 
@@ -515,6 +516,8 @@ public final class MVTPostgis: Sendable {
             callback: { connection in
                 let startTimestamp = Date()
 
+                let hstoreTypeOIDs = try await self.hstoreTypeOIDs(connection: connection, layer: layer)
+
                 let rowSequence = try await connection.query(PostgresQuery(stringLiteral: query), logger: logger)
 
                 // Probably a long running connection
@@ -538,59 +541,143 @@ public final class MVTPostgis: Sendable {
                     for field in row {
                         guard field.columnName != geometryColumn else { continue }
 
-                        switch field.dataType {
-                        case .bpchar, .text, .varchar:
-                            properties[field.columnName] = row[data: field.columnName].string
+                        let data = row[data: field.columnName]
 
-                        case .textArray, .varcharArray:
-                            if let array = row[data: field.columnName].array {
+                        if field.dataType.isUserDefined,
+                           hstoreTypeOIDs.contains(field.dataType.rawValue)
+                        {
+                            if let tags = Self.hstore(from: data) {
+                                properties[field.columnName] = tags
+                            }
+                            else {
+                                logger.debug("\(externalName ?? source.name): Could not decode hstore column '\(field.columnName)' in layer '\(layer.id)'")
+                            }
+                            continue
+                        }
+
+                        switch field.dataType {
+                        case .bpchar, .name, .text, .varchar:
+                            properties[field.columnName] = data.string
+
+                        case .bpcharArray, .nameArray, .textArray, .varcharArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .uuid:
-                            properties[field.columnName] = row[data: field.columnName].string
+                            properties[field.columnName] = data.string
 
                         case .uuidArray:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(\.string)
+                            }
+
+                        case .json, .jsonb:
+                            properties[field.columnName] = Self.jsonString(from: data)
+
+                        case .jsonArray, .jsonbArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.jsonString(from:))
+                            }
+
+                        case .bytea:
+                            properties[field.columnName] = Self.base64String(from: data)
+
+                        case .byteaArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.base64String(from:))
+                            }
+
+                        case .xml:
+                            properties[field.columnName] = Self.textString(from: data)
+
+                        case .xmlArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.textString(from:))
+                            }
+
+                        case .money:
+                            properties[field.columnName] = data.string
+
+                        case .moneyArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .int2, .int4, .int8:
-                            properties[field.columnName] = row[data: field.columnName].int
+                            properties[field.columnName] = data.int
 
                         case .int2Array, .int4Array, .int8Array:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.int)
                             }
 
-                        case .float4, .float8, .numeric:
-                            properties[field.columnName] = row[data: field.columnName].double
+                        case .oid, .regproc:
+                            properties[field.columnName] = data.int
 
-                        case .float4Array, .float8Array:
-                            if let array = row[data: field.columnName].array {
+                        case .regprocArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(\.int)
+                            }
+
+                        case .regclass, .regtype:
+                            properties[field.columnName] = Self.oidInt(from: data)
+
+                        case .regclassArray, .regtypeArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.oidInt(from:))
+                            }
+
+                        case .float4, .float8, .numeric:
+                            properties[field.columnName] = data.double
+
+                        case .float4Array, .float8Array, .numericArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.double)
                             }
 
                         case .bool:
-                            properties[field.columnName] = row[data: field.columnName].bool
+                            properties[field.columnName] = data.bool
 
                         case .boolArray:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.bool)
                             }
 
                         case .date, .timestamp, .timestamptz:
-                            properties[field.columnName] = row[data: field.columnName].date?.ISO8601Format()
+                            properties[field.columnName] = data.date?.ISO8601Format()
 
                         case .dateArray, .timestampArray, .timestamptzArray:
-                            if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format })
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format() })
                             }
 
+                        case .interval:
+                            properties[field.columnName] = Self.intervalString(from: data)
+
+                        case .intervalArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.intervalString(from:))
+                            }
+
+                        case .tsrange:
+                            properties[field.columnName] = Self.rangeString(from: data, boundType: .timestamp)
+
+                        case .tstzrange:
+                            properties[field.columnName] = Self.rangeString(from: data, boundType: .timestamptz)
+
+                        case .daterange:
+                            properties[field.columnName] = Self.rangeString(from: data, boundType: .date)
+
                         default:
-                            // select * from pg_type where oid = ?;
-                            // Please open an issue if you need more
-                            logger.debug("\(externalName ?? source.name): Unknown type OID \(field.dataType.rawValue) for column '\(field.columnName)' in layer '\(layer.id)'")
+                            if field.dataType.isUserDefined,
+                               let string = Self.userDefinedString(from: data)
+                            {
+                                properties[field.columnName] = string
+                            }
+                            else {
+                                logger.debug("\(externalName ?? source.name): Unsupported type OID \(field.dataType.rawValue) for column '\(field.columnName)' in layer '\(layer.id)'")
+                            }
                         }
                     }
 
@@ -653,6 +740,224 @@ public final class MVTPostgis: Sendable {
 
         // Features will be projected to EPSG:4326
         return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes.item, features: features.count, invalidFeatures: invalidFeatures.item, sqlQuery: query))
+    }
+
+    // MARK: - Property decoding
+
+    /// Returns the elements of a zero- or one-dimensional PostgreSQL array.
+    ///
+    /// `PostgresData.array` does not support multi-dimensional arrays. Reading
+    /// one can produce corrupt elements or trip its internal assertion, so
+    /// reject those arrays before decoding them.
+    private static func oneDimensionalArray(from data: PostgresData) -> [PostgresData]? {
+        guard var buffer = data.value,
+              let dimensions = buffer.readInteger(as: UInt32.self),
+              dimensions <= 1
+        else { return nil }
+
+        return data.array
+    }
+
+    /// Looks up and caches the OIDs of the `hstore` type in a database.
+    private func hstoreTypeOIDs(
+        connection: PostgresConnectionWrapper,
+        layer: PostgisLayer,
+    ) async throws -> Set<UInt32> {
+        let key = "\(layer.datasource.host):\(layer.datasource.port)/\(layer.datasource.databaseName)"
+        if let cached = customTypeOIDs.item[key] {
+            return cached
+        }
+
+        let rows = try await connection.query(
+            PostgresQuery(stringLiteral: "SELECT oid FROM pg_type WHERE typname = 'hstore'"),
+            logger: logger)
+        var oids: Set<UInt32> = []
+        for try await serialRow in rows {
+            let row = serialRow.makeRandomAccess()
+            if let oid = row[data: "oid"].int,
+               let value = UInt32(exactly: oid)
+            {
+                oids.insert(value)
+            }
+        }
+
+        var cache = customTypeOIDs.item
+        cache[key] = oids
+        customTypeOIDs.set(cache)
+
+        return oids
+    }
+
+    /// Decodes PostgreSQL's binary hstore representation.
+    private static func hstore(from data: PostgresData) -> [String: String]? {
+        guard var buffer = data.value,
+              let count = buffer.readInteger(as: Int32.self),
+              count >= 0
+        else { return nil }
+
+        var result: [String: String] = [:]
+
+        for _ in 0 ..< count {
+            guard let keyLength = buffer.readInteger(as: Int32.self),
+                  keyLength >= 0,
+                  let key = buffer.readString(length: Int(keyLength)),
+                  let valueLength = buffer.readInteger(as: Int32.self) else { return nil }
+
+            if valueLength < 0 {
+                // hstore NULL value; MVT properties cannot carry NULL values in a
+                // dictionary, so omit the key.
+                continue
+            }
+
+            guard let value = buffer.readString(length: Int(valueLength)) else { return nil }
+
+            result[key] = value
+        }
+
+        return result
+    }
+
+    /// Decodes a PostgreSQL interval to a readable string.
+    private static func intervalString(from data: PostgresData) -> String? {
+        guard var buffer = data.value,
+              buffer.readableBytes == 16,
+              let microseconds = buffer.readInteger(as: Int64.self),
+              let days = buffer.readInteger(as: Int32.self),
+              let months = buffer.readInteger(as: Int32.self)
+        else { return nil }
+
+        var parts: [String] = []
+
+        if months != 0 {
+            parts.append("\(months) mon")
+        }
+        if days != 0 {
+            parts.append("\(days) day")
+        }
+        if microseconds != 0 {
+            let absolute = abs(microseconds)
+            let hours = absolute / 3_600_000_000
+            let minutes = (absolute % 3_600_000_000) / 60_000_000
+            let seconds = (absolute % 60_000_000) / 1_000_000
+            let fraction = absolute % 1_000_000
+            var time = String(
+                format: "%@%02lld:%02lld:%02lld",
+                microseconds < 0 ? "-" : "",
+                hours,
+                minutes,
+                seconds)
+            if fraction != 0 {
+                time += String(format: ".%06lld", fraction)
+            }
+            parts.append(time)
+        }
+
+        return parts.isEmpty ? "00:00:00" : parts.joined(separator: " ")
+    }
+
+    /// Decodes a PostgreSQL range to a string such as `[2024-01-02,2024-01-05)`.
+    private static func rangeString(
+        from data: PostgresData,
+        boundType: PostgresDataType,
+    ) -> String? {
+        guard var buffer = data.value,
+              let flags = buffer.readInteger(as: UInt8.self)
+        else { return nil }
+
+        if flags & 0x01 != 0 {
+            return "empty"
+        }
+
+        let lowerInclusive = flags & 0x02 != 0
+        let upperInclusive = flags & 0x04 != 0
+        let lowerInfinite = flags & 0x08 != 0 || flags & 0x20 != 0
+        let upperInfinite = flags & 0x10 != 0 || flags & 0x40 != 0
+
+        let lower: String?
+        if lowerInfinite {
+            lower = nil
+        }
+        else {
+            guard let length = buffer.readInteger(as: Int32.self),
+                  length >= 0,
+                  let slice = buffer.readSlice(length: Int(length))
+            else { return nil }
+
+            lower = rangeBoundString(PostgresData(type: boundType, formatCode: .binary, value: slice))
+        }
+
+        let upper: String?
+        if upperInfinite {
+            upper = nil
+        }
+        else {
+            guard let length = buffer.readInteger(as: Int32.self),
+                  length >= 0,
+                  let slice = buffer.readSlice(length: Int(length))
+            else { return nil }
+
+            upper = rangeBoundString(PostgresData(type: boundType, formatCode: .binary, value: slice))
+        }
+
+        return "\(lowerInclusive ? "[" : "(")\(lower ?? ""),\(upper ?? "")\(upperInclusive ? "]" : ")")"
+    }
+
+    private static func rangeBoundString(_ data: PostgresData) -> String? {
+        switch data.type {
+        case .date, .timestamp, .timestamptz:
+            data.date?.ISO8601Format()
+        case .int4, .int8:
+            data.int?.description
+        case .numeric:
+            data.double?.description
+        default:
+            nil
+        }
+    }
+
+    /// Decodes a `json` or `jsonb` value to its JSON text representation.
+    private static func jsonString(from data: PostgresData) -> String? {
+        guard var buffer = data.value, buffer.readableBytes > 0 else { return nil }
+
+        if data.type == .jsonb {
+            buffer.moveReaderIndex(forwardBy: 1)
+        }
+
+        return String(decoding: buffer.readableBytesView, as: UTF8.self)
+    }
+
+    /// Decodes a text-encoded value such as `xml` to a string.
+    private static func textString(from data: PostgresData) -> String? {
+        guard let buffer = data.value else { return nil }
+
+        return String(decoding: buffer.readableBytesView, as: UTF8.self)
+    }
+
+    /// Encodes a binary value such as `bytea` as base64.
+    private static func base64String(from data: PostgresData) -> String? {
+        guard let bytes = data.bytes else { return nil }
+
+        return Data(bytes).base64EncodedString()
+    }
+
+    /// Reads an OID-backed value such as `regclass` or `regtype`.
+    private static func oidInt(from data: PostgresData) -> Int? {
+        guard var buffer = data.value,
+              buffer.readableBytes == 4,
+              let value = buffer.readInteger(as: UInt32.self)
+        else { return nil }
+
+        return Int(exactly: value)
+    }
+
+    /// Decodes text-like user-defined types (enums, citext, ltree) and rejects
+    /// binary values from domains, composites or hstore that are not text.
+    private static func userDefinedString(from data: PostgresData) -> String? {
+        guard let string = data.string,
+              string.rangeOfCharacter(from: .controlCharacters) == nil
+        else { return nil }
+
+        return string
     }
 
 }
