@@ -398,3 +398,44 @@ INSERT INTO "{{schema}}".id_edge_cases (case_name, id_text, label, geom) VALUES
     ('oversized', '9223372036854775808', 'oversized', ST_GeomFromText('POINT(11.5 48.1)', 4326)),
     ('dup1', '1', 'dup1', ST_GeomFromText('POINT(11.5 48.1)', 4326)),
     ('dup2', '1', 'dup2', ST_GeomFromText('POINT(11.5 48.1)', 4326));
+
+CREATE TABLE "{{schema}}".geometry_edge_cases (
+    id bigint PRIMARY KEY,
+    name text,
+    kind text,
+    geom geometry
+);
+
+INSERT INTO "{{schema}}".geometry_edge_cases (id, name, kind, geom) VALUES
+    (1, 'point', 'point', ST_GeomFromText('POINT(11.5 48.1)', 4326)),
+    (2, 'multipoint', 'multipoint', ST_GeomFromText('MULTIPOINT((11.495 48.095), (11.51 48.105))', 4326)),
+    (3, 'linestring', 'linestring', ST_GeomFromText('LINESTRING(11.493 48.094, 11.5 48.1, 11.512 48.106)', 4326)),
+    (4, 'multilinestring', 'multilinestring', ST_GeomFromText('MULTILINESTRING((11.493 48.094, 11.497 48.098), (11.505 48.102, 11.512 48.106))', 4326)),
+    (5, 'polygon', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094))', 4326)),
+    (6, 'polygon_hole', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094), (11.499 48.098, 11.506 48.098, 11.506 48.102, 11.499 48.102, 11.499 48.098))', 4326)),
+    (7, 'multipolygon', 'multipolygon', ST_GeomFromText('MULTIPOLYGON(((11.493 48.094, 11.498 48.094, 11.498 48.099, 11.493 48.099, 11.493 48.094)), ((11.507 48.101, 11.512 48.101, 11.512 48.106, 11.507 48.106, 11.507 48.101)))', 4326)),
+    (8, 'collection_homogeneous', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION(POINT(11.495 48.095), POINT(11.51 48.105))', 4326)),
+    (9, 'collection_mixed', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION(POINT(11.5 48.1), LINESTRING(11.493 48.094, 11.512 48.106))', 4326)),
+    (10, 'collection_nested', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION(POINT(11.5 48.1), GEOMETRYCOLLECTION(LINESTRING(11.493 48.094, 11.512 48.106)))', 4326)),
+    (11, 'point_empty', 'point', ST_GeomFromText('POINT EMPTY', 4326)),
+    (12, 'linestring_empty', 'linestring', ST_GeomFromText('LINESTRING EMPTY', 4326)),
+    (13, 'polygon_empty', 'polygon', ST_GeomFromText('POLYGON EMPTY', 4326)),
+    (14, 'multipoint_empty', 'multipoint', ST_GeomFromText('MULTIPOINT EMPTY', 4326)),
+    (15, 'multilinestring_empty', 'multilinestring', ST_GeomFromText('MULTILINESTRING EMPTY', 4326)),
+    (16, 'multipolygon_empty', 'multipolygon', ST_GeomFromText('MULTIPOLYGON EMPTY', 4326)),
+    (17, 'collection_empty', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION EMPTY', 4326)),
+    (18, 'point_z', 'point', ST_GeomFromText('POINT Z(11.5 48.1 100)', 4326)),
+    (19, 'linestring_z', 'linestring', ST_GeomFromText('LINESTRING Z(11.493 48.094 10, 11.512 48.106 20)', 4326)),
+    (20, 'polygon_z', 'polygon', ST_GeomFromText('POLYGON Z((11.493 48.094 0, 11.512 48.094 0, 11.512 48.106 0, 11.493 48.106 0, 11.493 48.094 0))', 4326)),
+    (21, 'point_m', 'point', ST_GeomFromText('POINT M(11.5 48.1 5)', 4326)),
+    (22, 'linestring_m', 'linestring', ST_GeomFromText('LINESTRING M(11.493 48.094 10, 11.512 48.106 20)', 4326)),
+    (23, 'polygon_m', 'polygon', ST_GeomFromText('POLYGON M((11.493 48.094 0, 11.512 48.094 0, 11.512 48.106 0, 11.493 48.106 0, 11.493 48.094 0))', 4326)),
+    (24, 'point_zm', 'point', ST_GeomFromText('POINT ZM(11.5 48.1 100 5)', 4326)),
+    (25, 'circularstring', 'circularstring', ST_GeomFromText('CIRCULARSTRING(11.493 48.094, 11.5 48.1, 11.512 48.106)', 4326)),
+    (26, 'compoundcurve', 'compoundcurve', ST_GeomFromText('COMPOUNDCURVE(CIRCULARSTRING(11.493 48.094, 11.5 48.1, 11.512 48.106), (11.512 48.106, 11.513 48.107))', 4326)),
+    (27, 'curvepolygon', 'curvepolygon', ST_GeomFromText('CURVEPOLYGON(CIRCULARSTRING(11.493 48.094, 11.5 48.106, 11.512 48.094, 11.503 48.1, 11.493 48.094))', 4326)),
+    (28, 'multicurve', 'multicurve', ST_GeomFromText('MULTICURVE(CIRCULARSTRING(11.493 48.094, 11.5 48.1, 11.512 48.094))', 4326)),
+    (29, 'multisurface', 'multisurface', ST_GeomFromText('MULTISURFACE(CURVEPOLYGON(CIRCULARSTRING(11.493 48.094, 11.5 48.106, 11.512 48.094, 11.503 48.1, 11.493 48.094)))', 4326)),
+    (30, 'triangle', 'triangle', ST_GeomFromText('TRIANGLE((11.493 48.094, 11.499 48.094, 11.493 48.100, 11.493 48.094))', 4326)),
+    (31, 'tin', 'tin', ST_GeomFromText('TIN(((11.493 48.094 0, 11.499 48.094 0, 11.493 48.100 0, 11.493 48.094 0)))', 4326)),
+    (32, 'polyhedralsurface', 'polyhedralsurface', ST_GeomFromText('POLYHEDRALSURFACE(((11.493 48.094 0, 11.499 48.094 0, 11.493 48.100 0, 11.493 48.094 0)))', 4326));

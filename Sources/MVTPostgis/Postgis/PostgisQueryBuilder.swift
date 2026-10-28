@@ -75,7 +75,9 @@ struct PostgisQueryBuilder {
             geometryExpression.append("ST_ClipByBox2D(")
         }
 
+        geometryExpression.append("ST_Force2D(")
         geometryExpression.append(quotedGeometryField)
+        geometryExpression.append("::geometry)")
 
         if case .postgis = clipping {
             geometryExpression.append(",\(envelope))")

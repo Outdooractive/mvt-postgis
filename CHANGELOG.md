@@ -19,6 +19,11 @@ and this project adheres to semantic versioning.
 - Deterministic property and feature-ID edge-case fixtures covering empty,
   long and Unicode text, control characters, integer/numeric/float extremes,
   temporal boundaries, duplicate IDs, missing IDs and non-integer IDs.
+- OGC geometry coverage for `Point`, `MultiPoint`, `LineString`,
+  `MultiLineString`, polygons with holes, `MultiPolygon`, homogeneous, mixed
+  and nested `GeometryCollection`s, empty variants, `Z`/`M`/`ZM` variants,
+  curved geometries, `Triangle`, `TIN` and `PolyhedralSurface`, including MVT
+  and MLT round-trip assertions.
 - A deterministic PostGIS integration suite with checked-in SQL fixtures,
   Docker/CI database setup, fake-loader pipeline tests, and a 90% coverage gate.
 - Public initializers for `PostgisSource`, `PostgisLayer`,
@@ -56,6 +61,9 @@ and this project adheres to semantic versioning.
 
 - PostgreSQL `numeric` `NaN`, `Infinity` and `-Infinity` were previously decoded
   as `0.0`; they are now preserved.
+- Geometries are converted to 2D with `ST_Force2D` before WKB decoding, so
+  columns with `Z`, `M` or `ZM` coordinates load instead of being reported as
+  invalid. `geography` columns are cast to `geometry` for the same reason.
 - Timestamps now keep microsecond precision, and `timestamptz` values are
   rendered consistently in UTC.
 - `validate(sql:forLayer:)` now explains Mapnik-style `(SELECT ...) AS data`
