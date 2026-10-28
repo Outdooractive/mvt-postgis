@@ -25,6 +25,12 @@ struct MVTPostgisErrorTests {
     }
 
     @Test
+    func missingGeometryColumn() {
+        let error = MVTPostgisError.missingGeometryColumn(layer: "roads", column: "shape")
+        #expect(error.description == "Missing geometry column 'shape' in layer 'roads'")
+    }
+
+    @Test
     func tileOutOfBounds() {
         #expect(MVTPostgisError.tileOutOfBounds.description == "Tile out of bounds")
     }

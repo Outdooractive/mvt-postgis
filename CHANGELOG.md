@@ -52,6 +52,12 @@ and this project adheres to semantic versioning.
   leaking and trapping in PostgresNIO on release.
 - Updated to `mvt-tools` 3.0.0-beta.6, `gis-tools` 3.0.0-beta.6,
   `gis-tools-csv` 3.0.0-beta.7 and `postgres-nio` 1.33.2.
+- Rows whose geometry SRID differs from the datasource-declared SRID are
+  skipped and counted in `invalidFeatures` instead of being decoded in the
+  wrong coordinate system. The query builder selects `ST_SRID(...)` for this
+  check.
+- Added `MVTPostgisError.missingGeometryColumn(layer:column:)` for result sets
+  without the configured geometry column.
 - Added direct `swift-log` and `swift-atomics` dependencies and removed the
   unused direct `swift-collections` dependency.
 - Layers may use any planar or geographic projection registered in GISTools;

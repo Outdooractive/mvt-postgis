@@ -12,6 +12,8 @@ public enum MVTPostgisError: Error, Equatable, Sendable {
     case needLayers
     /// A layer has an empty id.
     case invalidLayerId
+    /// The result set does not contain the configured geometry column.
+    case missingGeometryColumn(layer: String, column: String)
     /// The z/x/y coordinates of the tile are invalid.
     case tileOutOfBounds
     /// The tile timed out, i.e. not all queries return in time.
@@ -45,6 +47,9 @@ extension MVTPostgisError: CustomStringConvertible {
 
         case .invalidLayerId:
             return "Invalid layer id"
+
+        case let .missingGeometryColumn(layer, column):
+            return "Missing geometry column '\(column)' in layer '\(layer)'"
 
         case .tileOutOfBounds:
             return "Tile out of bounds"

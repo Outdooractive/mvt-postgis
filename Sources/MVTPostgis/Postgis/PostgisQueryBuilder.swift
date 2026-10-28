@@ -7,6 +7,10 @@ import GISTools
 /// live PostGIS database.
 struct PostgisQueryBuilder {
 
+    /// Internal column used to detect a row SRID that differs from the
+    /// datasource-declared SRID.
+    static let sridColumnName = "__mvt_postgis_srid"
+
     private static let metersPerDegree = GISTool.earthCircumference / 360.0
 
     let layer: PostgisLayer
@@ -114,6 +118,7 @@ struct PostgisQueryBuilder {
         geometryExpression.append(")")
         geometryExpression.append(" AS \(quotedGeometryField)")
         columns.append(geometryExpression)
+        columns.append("ST_SRID(\(quotedGeometryField)) AS \(Self.quotedIdentifier(Self.sridColumnName))")
 
         return "SELECT \(columns.joined(separator: ",")) FROM \(sql)"
     }

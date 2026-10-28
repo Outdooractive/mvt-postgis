@@ -439,3 +439,111 @@ INSERT INTO "{{schema}}".geometry_edge_cases (id, name, kind, geom) VALUES
     (30, 'triangle', 'triangle', ST_GeomFromText('TRIANGLE((11.493 48.094, 11.499 48.094, 11.493 48.100, 11.493 48.094))', 4326)),
     (31, 'tin', 'tin', ST_GeomFromText('TIN(((11.493 48.094 0, 11.499 48.094 0, 11.493 48.100 0, 11.493 48.094 0)))', 4326)),
     (32, 'polyhedralsurface', 'polyhedralsurface', ST_GeomFromText('POLYHEDRALSURFACE(((11.493 48.094 0, 11.499 48.094 0, 11.493 48.100 0, 11.493 48.094 0)))', 4326));
+
+CREATE TABLE "{{schema}}".geometry_degeneracy_cases (
+    id bigint PRIMARY KEY,
+    name text,
+    kind text,
+    geom geometry
+);
+
+INSERT INTO "{{schema}}".geometry_degeneracy_cases (id, name, kind, geom) VALUES
+    (1, 'zero_length_line', 'line', ST_GeomFromText('LINESTRING(11.5 48.1, 11.5 48.1)', 4326)),
+    (2, 'duplicate_points_line', 'line', ST_GeomFromText('LINESTRING(11.493 48.094, 11.493 48.094, 11.512 48.106)', 4326)),
+    (3, 'collinear_line', 'line', ST_GeomFromText('LINESTRING(11.493 48.094, 11.5 48.1, 11.507 48.106)', 4326)),
+    (4, 'zero_area_polygon', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.5 48.1, 11.507 48.106, 11.493 48.094))', 4326)),
+    (5, 'bowtie_polygon', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.507 48.106, 11.507 48.094, 11.493 48.106, 11.493 48.094))', 4326)),
+    (6, 'spike_polygon', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.5 48.094, 11.5 48.106, 11.507 48.094, 11.5 48.094, 11.5 48.086, 11.493 48.094))', 4326)),
+    (7, 'cw_exterior', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.493 48.106, 11.512 48.106, 11.512 48.094, 11.493 48.094))', 4326)),
+    (8, 'ccw_exterior', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094))', 4326)),
+    (9, 'hole_correct', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094), (11.499 48.098, 11.499 48.102, 11.506 48.102, 11.506 48.098, 11.499 48.098))', 4326)),
+    (10, 'hole_incorrect', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094), (11.499 48.098, 11.506 48.098, 11.506 48.102, 11.499 48.102, 11.499 48.098))', 4326)),
+    (11, 'multiple_holes', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094), (11.496 48.097, 11.499 48.097, 11.499 48.100, 11.496 48.100, 11.496 48.097), (11.505 48.100, 11.508 48.100, 11.508 48.103, 11.505 48.103, 11.505 48.100))', 4326)),
+    (12, 'nested_holes', 'polygon', ST_GeomFromText('POLYGON((11.493 48.094, 11.512 48.094, 11.512 48.106, 11.493 48.106, 11.493 48.094), (11.496 48.097, 11.509 48.097, 11.509 48.103, 11.496 48.103, 11.496 48.097), (11.500 48.099, 11.505 48.099, 11.505 48.101, 11.500 48.101, 11.500 48.099))', 4326)),
+    (13, 'collapsed_polygon', 'polygon', ST_GeomFromText('POLYGON((11.50270 48.10010, 11.50271 48.10010, 11.50271 48.10011, 11.50270 48.10011, 11.50270 48.10010))', 4326)),
+    (14, 'antimeridian_line', 'line', ST_GeomFromText('LINESTRING(179.9 48, -179.9 48)', 4326)),
+    (15, 'antimeridian_polygon', 'polygon', ST_GeomFromText('POLYGON((179.8 48, -179.8 48, -179.8 48.2, 179.8 48.2, 179.8 48))', 4326)),
+    (16, 'north_pole', 'point', ST_GeomFromText('POINT(0 89.999)', 4326)),
+    (17, 'south_pole', 'point', ST_GeomFromText('POINT(0 -89.999)', 4326)),
+    (18, 'mercator_max', 'point', ST_GeomFromText('POINT(0 85.0511)', 4326)),
+    (19, 'mercator_min', 'point', ST_GeomFromText('POINT(0 -85.0511)', 4326)),
+    (20, 'large_coordinates', 'line', ST_GeomFromText('LINESTRING(10000000 10000000, 10000001 10000001)', 4326)),
+    (21, 'small_coordinates', 'line', ST_GeomFromText('LINESTRING(0.000000001 0.000000001, 0.000000002 0.000000002)', 4326)),
+    (22, 'nan_point', 'point', ST_SetSRID(ST_MakePoint('NaN'::float8, 'NaN'::float8), 4326)),
+    (23, 'infinite_point', 'point', ST_SetSRID(ST_MakePoint('Infinity'::float8, 48.1), 4326));
+
+CREATE TABLE "{{schema}}".srid_edge_cases (
+    id bigint PRIMARY KEY,
+    name text,
+    geom geometry
+);
+
+INSERT INTO "{{schema}}".srid_edge_cases (id, name, geom) VALUES
+    (1, 'srid_4326', ST_SetSRID(ST_MakePoint(11.5, 48.1), 4326)),
+    (2, 'srid_3857', ST_SetSRID(ST_MakePoint(11.5, 48.1), 3857)),
+    (3, 'srid_0', ST_SetSRID(ST_MakePoint(11.5, 48.1), 0)),
+    (4, 'null_geometry', NULL),
+    (5, 'srid_32633', ST_SetSRID(ST_MakePoint(11.5, 48.1), 32633));
+
+CREATE TABLE "{{schema}}".geometry_column_edge_cases (
+    id bigint PRIMARY KEY,
+    name text,
+    geometry geometry(Point, 4326),
+    shape geometry(Point, 4326),
+    "select" geometry(Point, 4326),
+    "GEOM" geometry(Point, 4326),
+    geom_text text
+);
+
+INSERT INTO "{{schema}}".geometry_column_edge_cases (
+    id, name, geometry, shape, "select", "GEOM", geom_text
+) VALUES (
+    1, 'all-columns',
+    ST_GeomFromText('POINT(11.5 48.1)', 4326),
+    ST_GeomFromText('POINT(11.501 48.101)', 4326),
+    ST_GeomFromText('POINT(11.502 48.102)', 4326),
+    ST_GeomFromText('POINT(11.503 48.103)', 4326),
+    'not geometry'
+);
+
+CREATE TABLE "{{schema}}".non_geometry_geom (
+    id bigint PRIMARY KEY,
+    name text,
+    geom text
+);
+
+INSERT INTO "{{schema}}".non_geometry_geom (id, name, geom) VALUES
+    (1, 'text-geom', 'POINT(11.5 48.1)');
+
+CREATE TABLE "{{schema}}".bytea_geometry (
+    id bigint PRIMARY KEY,
+    name text,
+    geom bytea
+);
+
+INSERT INTO "{{schema}}".bytea_geometry (id, name, geom) VALUES
+    (1, 'truncated', '\x0101000000000000000000F03F'::bytea);
+
+CREATE TABLE "{{schema}}".geometry_join (
+    id bigint PRIMARY KEY,
+    name text,
+    geom geometry(Point, 4326)
+);
+
+INSERT INTO "{{schema}}".geometry_join (id, name, geom) VALUES
+    (1, 'join-row', ST_GeomFromText('POINT(11.5 48.1)', 4326));
+
+CREATE TABLE "{{schema}}".clip_edge_features (
+    id bigint PRIMARY KEY,
+    name text,
+    geom geometry(Point, 4326)
+);
+
+INSERT INTO "{{schema}}".clip_edge_features (id, name, geom) VALUES
+    (1, 'north_west', ST_GeomFromText('POINT(11.49169921875 48.1074311884804)', 4326)),
+    (2, 'north_east', ST_GeomFromText('POINT(11.513671875 48.1074311884804)', 4326)),
+    (3, 'south_east', ST_GeomFromText('POINT(11.513671875 48.09275716032736)', 4326)),
+    (4, 'south_west', ST_GeomFromText('POINT(11.49169921875 48.09275716032736)', 4326)),
+    (5, 'north_center', ST_GeomFromText('POINT(11.502685546875 48.1074311884804)', 4326)),
+    (6, 'east_center', ST_GeomFromText('POINT(11.513671875 48.10009417440378)', 4326)),
+    (7, 'just_outside', ST_GeomFromText('POINT(11.5137 48.10009417440378)', 4326));

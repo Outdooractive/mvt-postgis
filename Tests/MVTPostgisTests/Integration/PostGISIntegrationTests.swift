@@ -1519,4 +1519,313 @@ struct PostGISIntegrationTests {
         return nil
     }
 
+    // MARK: - Degenerate geometry, SRID and geometry columns
+
+    @Test(.timeLimit(.minutes(2)))
+    func loadsDegenerateGeometry() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "degenerate",
+                table: "geometry_degeneracy_cases",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".geometry_degeneracy_cases) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "degenerate")
+
+                func feature(_ name: String) -> Feature? {
+                    features.first { $0.properties["name"] as? String == name }
+                }
+
+                #expect(features.count == 23)
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).degenerate"]?.invalidFeatures == 0)
+
+                #expect((feature("zero_length_line")?.geometry as? LineString)?.coordinates.count == 2)
+                #expect((feature("duplicate_points_line")?.geometry as? LineString)?.coordinates.count == 3)
+                #expect((feature("collinear_line")?.geometry as? LineString)?.coordinates.count == 3)
+                #expect((feature("zero_area_polygon")?.geometry as? Polygon)?.coordinates.count == 1)
+                #expect((feature("bowtie_polygon")?.geometry as? Polygon)?.coordinates.count == 1)
+                #expect((feature("spike_polygon")?.geometry as? Polygon)?.coordinates.count == 1)
+                #expect((feature("cw_exterior")?.geometry as? Polygon)?.coordinates.count == 1)
+                #expect((feature("ccw_exterior")?.geometry as? Polygon)?.coordinates.count == 1)
+                #expect((feature("hole_correct")?.geometry as? Polygon)?.coordinates.count == 2)
+                #expect((feature("hole_incorrect")?.geometry as? Polygon)?.coordinates.count == 2)
+                #expect((feature("multiple_holes")?.geometry as? Polygon)?.coordinates.count == 3)
+                #expect((feature("nested_holes")?.geometry as? Polygon)?.coordinates.count == 3)
+                #expect((feature("collapsed_polygon")?.geometry as? Polygon)?.coordinates.count == 1)
+
+                #expect(feature("antimeridian_line")?.geometry is LineString)
+                #expect(feature("antimeridian_polygon")?.geometry is Polygon)
+                #expect(feature("north_pole")?.geometry is Point)
+                #expect(feature("south_pole")?.geometry is Point)
+                #expect(feature("mercator_max")?.geometry is Point)
+                #expect(feature("mercator_min")?.geometry is Point)
+                #expect(feature("large_coordinates")?.geometry is LineString)
+                #expect(feature("small_coordinates")?.geometry is LineString)
+
+                // NaN and infinite Point coordinates decode as empty points.
+                #expect((feature("nan_point")?.geometry as? MultiPoint)?.coordinates.isEmpty == true)
+                #expect((feature("infinite_point")?.geometry as? MultiPoint)?.coordinates.isEmpty == true)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func collapsesGeometryDuringSimplification() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "collapsed",
+                table: "geometry_degeneracy_cases",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".geometry_degeneracy_cases
+                 WHERE name = 'collapsed_polygon') AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(
+                    simplification: .meters(100_000, preserveCollapsed: false),
+                    trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = result.tile.features(for: "collapsed").first
+
+                #expect(feature == nil || (feature?.geometry as? Polygon)?.coordinates.isEmpty == true)
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).collapsed"]?.invalidFeatures ?? 0 <= 1)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func skipsFeaturesWithMismatchedSrid() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "srid",
+                table: "srid_edge_cases",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".srid_edge_cases) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "srid")
+                let names = Set(features.compactMap { $0.properties["name"] as? String })
+
+                #expect(names == ["srid_4326"])
+                // 3857, 0 and 32633 are mismatches; the NULL geometry is skipped.
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).srid"]?.invalidFeatures == 3)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func usesConfiguredGeometryColumn() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            func geometryLayer(id: String, field: String?, fields: [String: String]) -> PostgisLayer {
+                fixture.layer(
+                    id: id,
+                    table: "geometry_column_edge_cases",
+                    fields: fields,
+                    srid: .epsg4326,
+                    geometryField: field ?? "geometry",
+                    sql: """
+                    (SELECT * FROM "\(fixture.schema)".geometry_column_edge_cases) AS data
+                    """)
+            }
+
+            let layers = [
+                geometryLayer(id: "default", field: nil, fields: ["id": "", "name": "", "geometry": ""]),
+                geometryLayer(id: "shape", field: "shape", fields: ["id": "", "name": "", "shape": ""]),
+                geometryLayer(id: "reserved", field: "select", fields: ["id": "", "name": "", "select": ""]),
+                geometryLayer(id: "case", field: "GEOM", fields: ["id": "", "name": "", "GEOM": ""]),
+                geometryLayer(id: "two-columns", field: nil, fields: ["id": "", "name": "", "geometry": "", "shape": ""]),
+            ]
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                func point(_ id: String) -> Point? {
+                    result.tile.features(for: id).first?.geometry as? Point
+                }
+
+                #expect(point("default")?.coordinate.longitude == 11.5)
+                #expect(point("shape")?.coordinate.longitude == 11.501)
+                #expect(point("reserved")?.coordinate.longitude == 11.502)
+                #expect(point("case")?.coordinate.longitude == 11.503)
+                #expect(point("two-columns")?.coordinate.longitude == 11.5)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func missingGeometryColumnFails() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "missing",
+                table: "geometry_column_edge_cases",
+                fields: ["id": "", "name": ""],
+                srid: .epsg4326,
+                geometryField: "missing",
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".geometry_column_edge_cases) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected a missing-column error")
+                }
+                catch {
+                    // Postgres reports the missing column before the loader
+                    // can inspect the result set.
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func nonGeometryColumnWithWktTextIsSkipped() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "non-geometry",
+                table: "non_geometry_geom",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                geometryField: "geom",
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".non_geometry_geom) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                // PostGIS implicitly casts the WKT text to geometry with SRID 0,
+                // which the loader rejects as an SRID mismatch.
+                #expect(result.tile.features(for: "non-geometry").isEmpty)
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).non-geometry"]?.invalidFeatures == 1)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func ambiguousGeometryColumnFails() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "ambiguous",
+                table: "geometry_join",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                geometryField: "geom",
+                sql: """
+                (SELECT a.id, a.name, a.geom, b.geom
+                 FROM "\(fixture.schema)".geometry_join a
+                 JOIN "\(fixture.schema)".geometry_join b ON a.id = b.id) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected an ambiguous-column error")
+                }
+                catch {
+                    // The duplicate output name makes ST_SRID("geom") ambiguous.
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func truncatedWkbFailsWithoutCrashing() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "truncated",
+                table: "bytea_geometry",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                geometryField: "geom",
+                sql: """
+                (SELECT id, name, ST_GeomFromWKB(geom) AS geom
+                 FROM "\(fixture.schema)".bytea_geometry) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected malformed WKB to fail")
+                }
+                catch {
+                    // The failure is surfaced as a query error.
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func keepsPointsOnTileEdgesAndCorners() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "edges",
+                table: "clip_edge_features",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".clip_edge_features) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(clipping: .local))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                // Local clipping uses strict containment, so points exactly on
+                // the tile boundary and outside points are dropped.
+                #expect(result.tile.features(for: "edges").isEmpty)
+            }
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(clipping: .postgis))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "edges")
+
+                // ST_ClipByBox2D returns empty geometries for boundary and
+                // outside points. They remain in memory and are dropped by the
+                // MVT/MLT encoders.
+                #expect(features.count == 7)
+                #expect(features.allSatisfy { $0.geometry?.allCoordinates.isEmpty == true })
+            }
+        }
+    }
+
 }
