@@ -168,6 +168,8 @@ final class IntegrationFixture {
         fields: [String: String],
         srid: Projection,
         geometryField: String = "geom",
+        boundingBox: BoundingBox? = nil,
+        properties: PostgisLayer.Properties = PostgisLayer.Properties(),
         sql: String? = nil,
     ) -> PostgisLayer {
         let datasource = PostgisDatasource(
@@ -177,6 +179,7 @@ final class IntegrationFixture {
             port: IntegrationEnvironment.port,
             databaseName: IntegrationEnvironment.databaseName,
             geometryField: geometryField,
+            boundingBox: boundingBox,
             srid: srid,
             type: "postgis",
             sql: sql ?? """
@@ -185,6 +188,7 @@ final class IntegrationFixture {
         return PostgisLayer(
             id: id ?? table,
             fields: fields,
+            properties: properties,
             datasource: datasource)
     }
 

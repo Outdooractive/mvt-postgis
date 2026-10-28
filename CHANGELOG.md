@@ -38,6 +38,9 @@ and this project adheres to semantic versioning.
   `scripts/check_documentation.py`.
 - Tests for SQL generation, source defaults, URL loading, XML errors,
   initialization validation and skipped-layer orchestration.
+- End-to-end configuration coverage for clipping/simplification/validation
+  combinations, buffer sizes, zoom-dependent closures, layer bounds, runtime
+  tracking, feature mapping and export buffers.
 
 ### Changed
 
