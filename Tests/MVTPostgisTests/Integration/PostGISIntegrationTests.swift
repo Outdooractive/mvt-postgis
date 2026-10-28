@@ -1008,6 +1008,77 @@ struct PostGISIntegrationTests {
         }
     }
 
+    private func checkSupportedGeometryTypes(
+        clipping: MVTClippingOption,
+        simplification: MVTSimplificationOption,
+        label: String,
+    ) async throws {
+        let names = [
+            "point",
+            "multipoint",
+            "linestring",
+            "multilinestring",
+            "polygon",
+            "polygon_hole",
+            "multipolygon",
+            "triangle",
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            let layers = ogcGeometryLayers(fixture, names: names)
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration(
+                    clipping: clipping,
+                    simplification: simplification,
+                    trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                for name in names {
+                    #expect(result.tile.features(for: name).first?.geometry != nil, "\(label): \(name)")
+                    #expect(
+                        result.performance?["Integration.\(IntegrationEnvironment.databaseName).\(name)"]?.invalidFeatures == 0,
+                        "\(label): \(name)",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func postgisClippingKeepsSupportedGeometryTypes() async throws {
+        try await checkSupportedGeometryTypes(
+            clipping: .postgis,
+            simplification: .none,
+            label: "postgis clipping")
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func localClippingKeepsSupportedGeometryTypes() async throws {
+        try await checkSupportedGeometryTypes(
+            clipping: .local,
+            simplification: .none,
+            label: "local clipping")
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func localSimplificationKeepsSupportedGeometryTypes() async throws {
+        try await checkSupportedGeometryTypes(
+            clipping: .none,
+            simplification: .local,
+            label: "local simplification")
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func postgisSimplificationKeepsSupportedGeometryTypes() async throws {
+        try await checkSupportedGeometryTypes(
+            clipping: .none,
+            simplification: .postgis(preserveCollapsed: false),
+            label: "postgis simplification")
+    }
+
     @Test(.timeLimit(.minutes(2)))
     func roundTripDropsCollectionsAndEmptyGeometries() async throws {
         let names = [
