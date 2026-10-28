@@ -88,6 +88,14 @@ final class IntegrationDatabase {
         }
     }
 
+    /// Runs a query returning a single integer column aliased as `value`.
+    func queryInt(_ sql: String) async throws -> Int? {
+        let rows = try await connection.simpleQuery(sql).get()
+        guard let row = rows.first else { return nil }
+
+        return row.makeRandomAccess()[data: "value"].int
+    }
+
     func close() async {
         try? await connection.close().get()
         try? await group.shutdownGracefully()

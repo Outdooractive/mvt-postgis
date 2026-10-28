@@ -31,7 +31,13 @@ struct PostgisQueryBuilder {
         validation: MVTMakeValidOption,
     ) {
         self.layer = layer
-        self.sql = sql ?? layer.datasource.sql
+        var statement = (sql ?? layer.datasource.sql)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while statement.hasSuffix(";") {
+            statement.removeLast()
+            statement = statement.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        self.sql = statement
         self.envelope = envelope
         self.simplificationTolerance = simplificationTolerance
         self.clipping = clipping
