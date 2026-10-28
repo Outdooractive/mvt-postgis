@@ -40,7 +40,7 @@ struct PostgisQueryBuilderTests {
             validation: .none)
 
         #expect(builder.query == """
-        SELECT "name","weird""column",ST_AsBinary(ST_ClipByBox2D("geometry",ENVELOPE)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT "name","weird""column",ST_AsBinary(ST_ClipByBox2D(ST_Force2D("geometry"::geometry),ENVELOPE)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -56,7 +56,7 @@ struct PostgisQueryBuilderTests {
 
         #expect(builder.usesLocalSimplification)
         #expect(builder.query == """
-        SELECT "name",ST_AsBinary("geometry") AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT "name",ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -70,7 +70,7 @@ struct PostgisQueryBuilderTests {
             simplification: .postgis(preserveCollapsed: true),
             validation: .none)
 
-        #expect(builder.query.contains("ST_AsBinary(ST_Simplify(\"geometry\",2.5,true)) AS \"geometry\""))
+        #expect(builder.query.contains("ST_AsBinary(ST_Simplify(ST_Force2D(\"geometry\"::geometry),2.5,true)) AS \"geometry\""))
     }
 
     @Test
@@ -83,7 +83,7 @@ struct PostgisQueryBuilderTests {
             simplification: .meters(10.0, preserveCollapsed: false),
             validation: .none)
 
-        #expect(builder.query.contains("ST_AsBinary(ST_Simplify(\"geometry\",10.0)) AS \"geometry\""))
+        #expect(builder.query.contains("ST_AsBinary(ST_Simplify(ST_Force2D(\"geometry\"::geometry),10.0)) AS \"geometry\""))
     }
 
     @Test
@@ -96,7 +96,7 @@ struct PostgisQueryBuilderTests {
             simplification: .none,
             validation: .structure(keepCollapsed: false))
 
-        #expect(builder.query.contains("ST_AsBinary(ST_MakeValid(\"geometry\", 'method=structure keepcollapsed=false')) AS \"geometry\""))
+        #expect(builder.query.contains("ST_AsBinary(ST_MakeValid(ST_Force2D(\"geometry\"::geometry), 'method=structure keepcollapsed=false')) AS \"geometry\""))
     }
 
     @Test
@@ -110,7 +110,7 @@ struct PostgisQueryBuilderTests {
             simplification: .postgis(preserveCollapsed: true),
             validation: .structure(keepCollapsed: false))
 
-        #expect(builder.query.contains("ST_AsBinary(ST_MakeValid(ST_Simplify(ST_ClipByBox2D(\"geometry\",ENVELOPE),2.5,true), 'method=structure keepcollapsed=false')) AS \"geometry\""))
+        #expect(builder.query.contains("ST_AsBinary(ST_MakeValid(ST_Simplify(ST_ClipByBox2D(ST_Force2D(\"geometry\"::geometry),ENVELOPE),2.5,true), 'method=structure keepcollapsed=false')) AS \"geometry\""))
     }
 
     @Test
@@ -124,7 +124,7 @@ struct PostgisQueryBuilderTests {
             validation: .none)
 
         #expect(builder.query == """
-        SELECT ST_AsBinary("geometry") AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
+        SELECT ST_AsBinary(ST_Force2D("geometry"::geometry)) AS "geometry" FROM (SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places
         """)
     }
 
@@ -132,6 +132,22 @@ struct PostgisQueryBuilderTests {
     func identifierQuotingEscapesEmbeddedQuotes() {
         #expect(PostgisQueryBuilder.quotedIdentifier("geometry") == "\"geometry\"")
         #expect(PostgisQueryBuilder.quotedIdentifier(#"a"b"#) == #""a""b""#)
+    }
+
+    @Test
+    func geometryExpressionForcesTwoDimensionsAndCastsToGeometry() {
+        let builder = PostgisQueryBuilder(
+            layer: layer(
+                fields: ["name": "", "shape": ""],
+                geometryField: "shape",
+                sql: "(SELECT name, shape FROM places WHERE shape && !bbox!) AS places"),
+            envelope: "ENVELOPE",
+            simplificationTolerance: 2.5,
+            clipping: .none,
+            simplification: .none,
+            validation: .none)
+
+        #expect(builder.query.contains("ST_AsBinary(ST_Force2D(\"shape\"::geometry)) AS \"shape\""))
     }
 
     @Test
@@ -154,7 +170,7 @@ struct PostgisQueryBuilderTests {
             clipping: .none,
             simplification: .postgis(preserveCollapsed: false),
             validation: .none)
-        #expect(postgisBuilder.query.contains("ST_AsBinary(ST_Simplify(\"geometry\",1.0)) AS \"geometry\""))
+        #expect(postgisBuilder.query.contains("ST_AsBinary(ST_Simplify(ST_Force2D(\"geometry\"::geometry),1.0)) AS \"geometry\""))
 
         let meterBuilder = PostgisQueryBuilder(
             layer: geographicLayer,
@@ -163,7 +179,7 @@ struct PostgisQueryBuilderTests {
             clipping: .none,
             simplification: .meters(GISTool.earthCircumference / 360.0, preserveCollapsed: false),
             validation: .none)
-        #expect(meterBuilder.query.contains("ST_AsBinary(ST_Simplify(\"geometry\",1.0)) AS \"geometry\""))
+        #expect(meterBuilder.query.contains("ST_AsBinary(ST_Simplify(ST_Force2D(\"geometry\"::geometry),1.0)) AS \"geometry\""))
     }
 
 }

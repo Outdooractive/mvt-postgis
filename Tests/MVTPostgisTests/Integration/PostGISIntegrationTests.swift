@@ -96,6 +96,43 @@ struct PostGISIntegrationTests {
         "geom": "",
     ]
 
+    private static let ogcGeometryNames = [
+        "point",
+        "multipoint",
+        "linestring",
+        "multilinestring",
+        "polygon",
+        "polygon_hole",
+        "multipolygon",
+        "collection_homogeneous",
+        "collection_mixed",
+        "collection_nested",
+        "point_empty",
+        "linestring_empty",
+        "polygon_empty",
+        "multipoint_empty",
+        "multilinestring_empty",
+        "multipolygon_empty",
+        "collection_empty",
+        "point_z",
+        "linestring_z",
+        "polygon_z",
+        "point_m",
+        "linestring_m",
+        "polygon_m",
+        "point_zm",
+        "circularstring",
+        "compoundcurve",
+        "curvepolygon",
+        "multicurve",
+        "multisurface",
+        "triangle",
+        "tin",
+        "polyhedralsurface",
+    ]
+
+    private static let ogcGeometryFields = ["id": "", "name": "", "kind": "", "geom": ""]
+
     private static let propertyEdgeFields: [String: String] = [
         "case_name": "",
         "text_empty": "",
@@ -807,6 +844,201 @@ struct PostGISIntegrationTests {
 
                 #expect(nullFeature.properties["null_prop"] == nil)
                 #expect(absentFeature.properties["null_prop"] == nil)
+            }
+        }
+    }
+
+    private func ogcGeometryLayers(_ fixture: IntegrationFixture, names: [String], sql: String? = nil) -> [PostgisLayer] {
+        names.map { name in
+            fixture.layer(
+                id: name,
+                table: "geometry_edge_cases",
+                fields: Self.ogcGeometryFields,
+                srid: .epsg4326,
+                sql: sql ?? """
+                (SELECT * FROM "\(fixture.schema)".geometry_edge_cases
+                 WHERE name = '\(name)') AS data
+                """)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func loadsOgcGeometryTypes() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layers = ogcGeometryLayers(fixture, names: Self.ogcGeometryNames)
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                func feature(_ name: String) -> Feature? {
+                    result.tile.features(for: name).first
+                }
+
+                func invalid(_ name: String) -> Int? {
+                    result.performance?["Integration.\(IntegrationEnvironment.databaseName).\(name)"]?.invalidFeatures
+                }
+
+                #expect(feature("point")?.geometry is Point)
+                #expect(feature("multipoint")?.geometry is MultiPoint)
+                #expect(feature("linestring")?.geometry is LineString)
+                #expect(feature("multilinestring")?.geometry is MultiLineString)
+                #expect(feature("polygon")?.geometry is Polygon)
+                #expect((feature("polygon_hole")?.geometry as? Polygon)?.coordinates.count == 2)
+                #expect((feature("multipolygon")?.geometry as? MultiPolygon)?.polygons.count == 2)
+
+                #expect((feature("collection_homogeneous")?.geometry as? GeometryCollection)?.geometries.count == 2)
+                #expect((feature("collection_mixed")?.geometry as? GeometryCollection)?.geometries.count == 2)
+                let nested = feature("collection_nested")?.geometry as? GeometryCollection
+                #expect(nested?.geometries.count == 2)
+                #expect(nested?.geometries.contains { $0 is GeometryCollection } == true)
+
+                #expect(feature("point_empty") == nil)
+                #expect(invalid("point_empty") == 1)
+                #expect((feature("linestring_empty")?.geometry as? LineString)?.coordinates.isEmpty == true)
+                #expect((feature("polygon_empty")?.geometry as? Polygon)?.coordinates.isEmpty == true)
+                #expect((feature("multipoint_empty")?.geometry as? MultiPoint)?.coordinates.isEmpty == true)
+                #expect((feature("multilinestring_empty")?.geometry as? MultiLineString)?.coordinates.isEmpty == true)
+                #expect((feature("multipolygon_empty")?.geometry as? MultiPolygon)?.polygons.isEmpty == true)
+                #expect((feature("collection_empty")?.geometry as? GeometryCollection)?.geometries.isEmpty == true)
+
+                #expect(feature("point_z")?.geometry is Point)
+                #expect((feature("point_z")?.geometry as? Point)?.coordinate.altitude == nil)
+                #expect(feature("linestring_z")?.geometry is LineString)
+                #expect(feature("polygon_z")?.geometry is Polygon)
+                #expect(feature("point_m")?.geometry is Point)
+                #expect(feature("linestring_m")?.geometry is LineString)
+                #expect(feature("polygon_m")?.geometry is Polygon)
+                #expect(feature("point_zm")?.geometry is Point)
+                #expect((feature("point_zm")?.geometry as? Point)?.coordinate.altitude == nil)
+
+                #expect(feature("triangle")?.geometry is Polygon)
+
+                for name in ["circularstring", "compoundcurve", "curvepolygon", "multicurve", "multisurface", "tin", "polyhedralsurface"] {
+                    #expect(feature(name) == nil)
+                    #expect(invalid(name) == 1)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func convertsCurvedGeometriesWithStCurveToLine() async throws {
+        let names = ["circularstring", "compoundcurve", "curvepolygon", "multicurve", "multisurface"]
+
+        try await IntegrationFixture.withFixture { fixture in
+            let layers = names.map { name in
+                fixture.layer(
+                    id: name,
+                    table: "geometry_edge_cases",
+                    fields: Self.ogcGeometryFields,
+                    srid: .epsg4326,
+                    sql: """
+                    (SELECT id, name, kind, ST_CurveToLine(geom) AS geom
+                     FROM "\(fixture.schema)".geometry_edge_cases
+                     WHERE name = '\(name)') AS data
+                    """)
+            }
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                func feature(_ name: String) -> Feature? {
+                    result.tile.features(for: name).first
+                }
+                func invalid(_ name: String) -> Int? {
+                    result.performance?["Integration.\(IntegrationEnvironment.databaseName).\(name)"]?.invalidFeatures
+                }
+
+                #expect(feature("circularstring")?.geometry is LineString)
+                #expect(feature("compoundcurve")?.geometry is LineString)
+                #expect(feature("curvepolygon")?.geometry is Polygon)
+                #expect(feature("multicurve")?.geometry is MultiLineString)
+                #expect(feature("multisurface")?.geometry is MultiPolygon)
+                for name in names {
+                    #expect(invalid(name) == 0)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func roundTripsSupportedGeometryTypes() async throws {
+        let names = [
+            "point",
+            "multipoint",
+            "linestring",
+            "multilinestring",
+            "polygon",
+            "polygon_hole",
+            "multipolygon",
+            "point_z",
+            "triangle",
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            let layers = ogcGeometryLayers(fixture, names: names)
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration())
+            { postgis in
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mlt = try await postgis.data(forTile: Self.tile, format: .mlt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
+
+                for tile in [mvtTile, mltTile] {
+                    #expect(tile.features(for: "point").first?.geometry is Point)
+                    #expect(tile.features(for: "multipoint").first?.geometry is MultiPoint)
+                    #expect(tile.features(for: "linestring").first?.geometry is LineString)
+                    #expect(tile.features(for: "multilinestring").first?.geometry is MultiLineString)
+                    #expect(tile.features(for: "polygon").first?.geometry is Polygon)
+                    #expect((tile.features(for: "polygon_hole").first?.geometry as? Polygon)?.coordinates.count == 2)
+                    #expect((tile.features(for: "multipolygon").first?.geometry as? MultiPolygon)?.polygons.count == 2)
+                    #expect(tile.features(for: "point_z").first?.geometry is Point)
+                    #expect((tile.features(for: "point_z").first?.geometry as? Point)?.coordinate.altitude == nil)
+                    #expect(tile.features(for: "triangle").first?.geometry is Polygon)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func roundTripDropsCollectionsAndEmptyGeometries() async throws {
+        let names = [
+            "collection_homogeneous",
+            "collection_mixed",
+            "collection_nested",
+            "linestring_empty",
+            "polygon_empty",
+            "multipoint_empty",
+            "multilinestring_empty",
+            "multipolygon_empty",
+            "collection_empty",
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            let layers = ogcGeometryLayers(fixture, names: names)
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration())
+            { postgis in
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mlt = try await postgis.data(forTile: Self.tile, format: .mlt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
+
+                for tile in [mvtTile, mltTile] {
+                    for name in names {
+                        #expect(tile.features(for: name).isEmpty)
+                    }
+                }
             }
         }
     }

@@ -63,9 +63,9 @@ sentinel dates rather than the strings `infinity` / `-infinity`.
 ## Feature IDs
 
 Only a **non-negative integer** property named `id` is used as the feature ID. It is
-removed from the properties. Zero, negative, text, UUID, floating-point,
-boolean, array/JSON and oversized numeric `id` values remain regular
-properties, and the in-memory feature receives a generated string ID.
+removed from the properties. Negative, text, UUID, floating-point, boolean,
+array/JSON and oversized numeric `id` values remain regular properties, and the
+in-memory feature receives a generated string ID.
 
 MVT and MLT feature IDs are unsigned integers. Non-numeric IDs are therefore
 not encoded as feature IDs, and duplicate numeric IDs are allowed.
@@ -75,12 +75,43 @@ not encoded as feature IDs, and duplicate numeric IDs are allowed.
 MVT and MLT quantize geometry to the tile grid. A round trip does not preserve
 altitude, GeoJSON `m` values, string feature IDs, or foreign members.
 
+## Geometry types
+
+The query builder loads any PostGIS geometry value that GISTools can decode:
+
+- `Point`, `MultiPoint`, `LineString`, `MultiLineString`
+- `Polygon` (with or without holes) and `MultiPolygon`
+- `GeometryCollection` with homogeneous, mixed or nested contents
+- `Triangle`, which is loaded as a `Polygon`
+
+Curved geometries (`CircularString`, `CompoundCurve`, `CurvePolygon`,
+`MultiCurve`, `MultiSurface`), `TIN` and `PolyhedralSurface` cannot be decoded
+and are counted as invalid features. Convert curves in SQL with
+`ST_CurveToLine`; `TIN` and `PolyhedralSurface` have no MVT/MLT equivalent and
+must be converted to a flat geometry type before loading.
+
+Geometries with `Z`, `M` or `ZM` coordinates are converted to 2D with
+`ST_Force2D` before WKB decoding, so they load normally but altitude and
+measure values are discarded. `geography` columns are cast to `geometry` first
+and load the same way. MVT and MLT do not carry `Z` or `M` values.
+
+Empty geometries load as empty geometries, except an empty `Point`, which is
+skipped as an invalid feature. Empty geometries are dropped when encoding MVT
+or MLT because neither format has an empty geometry type.
+
+## Geometry collections
+
+MVT and MLT have no geometry-collection type. `GeometryCollection` features are
+kept in the in-memory `VectorTile` but dropped when encoding MVT or MLT. Split
+collections in SQL (for example with `ST_CollectionExtract` or `ST_Dump`) if
+they need to reach a tile consumer.
+
 ## Multi-geometry round trips
 
-The in-memory `VectorTile` preserves `MultiPoint` and `MultiLineString`
-geometries. MVT/MLT encoders and decoders may flatten them to `Point` or
-`LineString` respectively; assert the decoded geometry type if your consumer
-depends on it.
+A single-part `MultiPoint` or `MultiLineString` may decode as `Point` or
+`LineString`; multi-part geometries are preserved. Polygon holes,
+`MultiPolygon`, and `Triangle` (which is loaded as `Polygon`) survive a round
+trip. Assert the decoded geometry type if your consumer depends on it.
 
 ## No HTTP server
 
