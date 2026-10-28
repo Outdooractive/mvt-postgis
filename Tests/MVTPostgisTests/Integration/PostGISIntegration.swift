@@ -117,7 +117,17 @@ final class IntegrationFixture {
     static func create() async throws -> IntegrationFixture {
         let database = try await IntegrationDatabase.connect()
         do {
-            try await database.execute("CREATE EXTENSION IF NOT EXISTS postgis")
+            do {
+                try await database.execute("CREATE EXTENSION IF NOT EXISTS postgis")
+            }
+            catch {
+                // `CREATE EXTENSION IF NOT EXISTS` is not atomic. Parallel test
+                // suites can race on the extension name index; the extension is
+                // installed after the losing statement fails.
+                let installed = try await database.queryInt(
+                    "SELECT 1 AS value FROM pg_extension WHERE extname = 'postgis'")
+                guard installed == 1 else { throw error }
+            }
 
             let schema = "mvt_test_\(UUID().uuidString.replacing("-", with: ""))"
             try await database.execute("CREATE SCHEMA \"\(schema)\"")
