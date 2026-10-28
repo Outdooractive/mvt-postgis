@@ -38,6 +38,56 @@ struct PostGISIntegrationTests {
         "geom": "",
     ]
 
+    private static let extendedTypeFields: [String: String] = [
+        "id": "",
+        "json_value": "",
+        "jsonb_value": "",
+        "json_array": "",
+        "jsonb_array": "",
+        "bytea_value": "",
+        "bytea_array": "",
+        "xml_value": "",
+        "xml_array": "",
+        "money_value": "",
+        "money_array": "",
+        "oid_value": "",
+        "regproc_value": "",
+        "regproc_array": "",
+        "regclass_value": "",
+        "regclass_array": "",
+        "regtype_value": "",
+        "regtype_array": "",
+        "numeric_array": "",
+        "bpchar_array": "",
+        "name_value": "",
+        "name_array": "",
+        "uuid_array": "",
+        "date_array": "",
+        "timestamp_array": "",
+        "timestamptz_array": "",
+        "enum_value": "",
+        "unsupported_time": "",
+        "unsupported_interval": "",
+        "unsupported_inet": "",
+        "unsupported_cidr": "",
+        "unsupported_macaddr": "",
+        "unsupported_bit": "",
+        "unsupported_range": "",
+        "domain_value": "",
+        "unsupported_composite": "",
+        "geom": "",
+    ]
+
+    private static let arrayEdgeCaseFields: [String: String] = [
+        "id": "",
+        "empty_int_array": "",
+        "null_int_array": "",
+        "int_array_with_null": "",
+        "text_array_with_null": "",
+        "multi_int_array": "",
+        "geom": "",
+    ]
+
     private func configuration(
         clipping: MVTClippingOption = .none,
         simplification: MVTSimplificationOption = .none,
@@ -159,6 +209,113 @@ struct PostGISIntegrationTests {
                 #expect(properties["varchar_value"] as? String == "varchar")
                 #expect(properties["varchar_array"] as? [String] == ["x", "y"])
                 #expect(properties["inet_value"] == nil)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func `decodes extended property types`() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "extended",
+                table: "extended_types",
+                fields: Self.extendedTypeFields,
+                srid: .epsg4326)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = try #require(result.tile.features(for: "extended").first)
+                let properties = feature.properties
+
+                #expect(feature.id == .int(1))
+
+                #expect(Self.jsonObject(properties["json_value"])?["a"] as? Int == 1)
+                #expect(Self.jsonObject(properties["jsonb_value"])?["b"] as? [Int] == [1, 2])
+
+                let jsonArray = try #require(properties["json_array"] as? [String])
+                #expect(jsonArray.count == 2)
+                #expect(Self.jsonObject(jsonArray[0])?["c"] as? Int == 3)
+                #expect(Self.jsonObject(jsonArray[1])?["d"] as? Int == 4)
+
+                let jsonbArray = try #require(properties["jsonb_array"] as? [String])
+                #expect(jsonbArray.count == 2)
+                #expect(Self.jsonObject(jsonbArray[0])?["e"] as? Int == 5)
+                #expect(Self.jsonObject(jsonbArray[1])?["f"] as? Int == 6)
+
+                #expect(properties["bytea_value"] as? String == Data([0xDE, 0xAD, 0xBE, 0xEF]).base64EncodedString())
+                #expect(properties["bytea_array"] as? [String] == [
+                    Data([0x01, 0x02]).base64EncodedString(),
+                    Data([0x03, 0x04]).base64EncodedString(),
+                ])
+
+                #expect((properties["xml_value"] as? String)?.contains("<root>") == true)
+                #expect((properties["xml_array"] as? [String])?.count == 2)
+
+                #expect(properties["money_value"] as? String == "12.34")
+                #expect(properties["money_array"] as? [String] == ["1.23", "4.56"])
+                #expect(properties["oid_value"] as? Int == 1234)
+                #expect((properties["regproc_value"] as? Int ?? 0) > 0)
+                #expect((properties["regproc_array"] as? [Int])?.count == 2)
+                #expect((properties["regclass_value"] as? Int ?? 0) > 0)
+                #expect((properties["regclass_array"] as? [Int])?.count == 2)
+                #expect((properties["regtype_value"] as? Int ?? 0) > 0)
+                #expect((properties["regtype_array"] as? [Int])?.count == 2)
+
+                #expect(properties["numeric_array"] as? [Double] == [1.5, 2.5])
+                #expect((properties["bpchar_array"] as? [String])?.map { $0.trimmingCharacters(in: .whitespaces) } == ["A", "B"])
+                #expect(properties["name_value"] as? String == "a_name")
+                #expect(properties["name_array"] as? [String] == ["x", "y"])
+                #expect(properties["uuid_array"] as? [String] == [
+                    "00000000-0000-0000-0000-000000000001",
+                    "00000000-0000-0000-0000-000000000002",
+                ])
+                #expect((properties["date_array"] as? [String])?.first?.hasPrefix("2024-01-02") == true)
+                #expect((properties["timestamp_array"] as? [String])?.first?.hasPrefix("2024-01-02T03:04:05") == true)
+                #expect((properties["timestamptz_array"] as? [String])?.first?.hasPrefix("2024-01-02T03:04:05") == true)
+                #expect(properties["enum_value"] as? String == "happy")
+
+                #expect(properties["unsupported_time"] == nil)
+                #expect(properties["unsupported_interval"] == nil)
+                #expect(properties["unsupported_inet"] == nil)
+                #expect(properties["unsupported_cidr"] == nil)
+                #expect(properties["unsupported_macaddr"] == nil)
+                #expect(properties["unsupported_bit"] == nil)
+                #expect(properties["unsupported_range"] == nil)
+                #expect(properties["domain_value"] as? Int == 42)
+                #expect(properties["unsupported_composite"] == nil)
+
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).extended"]?.invalidFeatures == 0)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func `decodes array edge cases`() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "array_edges",
+                table: "array_edge_cases",
+                fields: Self.arrayEdgeCaseFields,
+                srid: .epsg4326)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(trackRuntimes: true))
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = try #require(result.tile.features(for: "array_edges").first)
+                let properties = feature.properties
+
+                #expect(properties["empty_int_array"] as? [Int] == [])
+                #expect(properties["null_int_array"] == nil)
+                #expect(properties["int_array_with_null"] as? [Int] == [1, 3])
+                #expect(properties["text_array_with_null"] as? [String] == ["a", "b"])
+                #expect(properties["multi_int_array"] == nil)
+
+                #expect(result.performance?["Integration.\(IntegrationEnvironment.databaseName).array_edges"]?.invalidFeatures == 0)
             }
         }
     }
@@ -503,6 +660,14 @@ struct PostGISIntegrationTests {
                 }
             }
         }
+    }
+
+    private static func jsonObject(_ value: Any?) -> [String: Any]? {
+        guard let string = value as? String,
+              let data = string.data(using: .utf8)
+        else { return nil }
+
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
 }

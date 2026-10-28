@@ -20,6 +20,39 @@ they are passed to PostGIS unchanged. For geographic projections they are
 converted to degrees with the spherical metres-per-degree constant; longitude
 distortion at high latitudes makes that conversion approximate.
 
+## Property types
+
+The following PostgreSQL property types are decoded:
+
+- `text`, `varchar`, `bpchar`, `name`
+- `uuid`
+- `int2`, `int4`, `int8`, `oid`, `regproc`, `regclass`, `regtype`
+- `float4`, `float8`, `numeric`
+- `boolean`
+- `date`, `timestamp`, `timestamptz` (ISO 8601 strings)
+- `json`, `jsonb` (JSON text)
+- `xml` (text)
+- `bytea` (base64)
+- `money` (decimal string)
+- one-dimensional arrays of the above; `NULL` elements are dropped and empty
+  arrays are preserved. `oid[]` is not supported because PostgresNIO currently
+  reports it in text format.
+- enums and text-like user-defined types
+- domains over a supported scalar type (decoded as the base type)
+
+Not yet supported; the property is omitted and a debug message is logged:
+
+- `time`, `timetz`, `interval`
+- `inet`, `cidr`, `macaddr`, `macaddr8`
+- `bit`, `varbit`
+- range and multirange types
+- composite types, `hstore`
+- multidimensional arrays
+
+`numeric` values are converted to `Double`, so very high-precision values can
+lose precision. Multi-dimensional arrays are rejected before decoding because
+PostgresNIO's array decoder only supports zero- and one-dimensional arrays.
+
 ## MVT and MLT are lossy
 
 MVT and MLT quantize geometry to the tile grid. A round trip does not preserve
@@ -38,6 +71,7 @@ whole tile. A timed-out tile is reported as
 
 ## Database availability
 
-Connection pools are recreated after a database outage only when a TCP probe
-succeeds. During an outage, requests fail fast rather than reconnecting on
-every request.
+Transient database failures fail the current request and keep the pool alive;
+the next request retries after the connection cooldown. A pool permanently shut
+down by an authentication, TLS or database-name error is recreated only when a
+TCP probe succeeds, so an outage cannot trigger an unbounded number of pools.

@@ -152,3 +152,107 @@ CREATE TABLE "{{schema}}".missing_geometry (
 
 INSERT INTO "{{schema}}".missing_geometry (id, name) VALUES
     (1, 'no-geometry');
+
+CREATE TYPE "{{schema}}".mood AS ENUM ('sad', 'ok', 'happy');
+CREATE DOMAIN "{{schema}}".positive_int AS int4 CHECK (VALUE > 0);
+CREATE TYPE "{{schema}}".pair AS (x int4, y int4);
+
+CREATE TABLE "{{schema}}".extended_types (
+    id bigint PRIMARY KEY,
+    json_value json,
+    jsonb_value jsonb,
+    json_array json[],
+    jsonb_array jsonb[],
+    bytea_value bytea,
+    bytea_array bytea[],
+    xml_value xml,
+    xml_array xml[],
+    money_value money,
+    money_array money[],
+    oid_value oid,
+    regproc_value regproc,
+    regproc_array regproc[],
+    regclass_value regclass,
+    regclass_array regclass[],
+    regtype_value regtype,
+    regtype_array regtype[],
+    numeric_array numeric[],
+    bpchar_array char(4)[],
+    name_value name,
+    name_array name[],
+    uuid_array uuid[],
+    date_array date[],
+    timestamp_array timestamp[],
+    timestamptz_array timestamptz[],
+    enum_value "{{schema}}".mood,
+    unsupported_time time,
+    unsupported_interval interval,
+    unsupported_inet inet,
+    unsupported_cidr cidr,
+    unsupported_macaddr macaddr,
+    unsupported_bit bit(4),
+    unsupported_range int4range,
+    domain_value "{{schema}}".positive_int,
+    unsupported_composite "{{schema}}".pair,
+    geom geometry(Point, 4326)
+);
+
+INSERT INTO "{{schema}}".extended_types VALUES (
+    1,
+    '{"a": 1}',
+    '{"b": [1, 2]}',
+    ARRAY['{"c": 3}'::json, '{"d": 4}'::json],
+    ARRAY['{"e": 5}'::jsonb, '{"f": 6}'::jsonb],
+    '\xDEADBEEF'::bytea,
+    ARRAY['\x0102'::bytea, '\x0304'::bytea],
+    '<root><a>1</a></root>'::xml,
+    ARRAY['<a>1</a>'::xml, '<b>2</b>'::xml],
+    12.34::money,
+    ARRAY[1.23::money, 4.56::money],
+    1234::oid,
+    'pg_catalog.now'::regproc,
+    ARRAY['pg_catalog.now'::regproc, 'pg_catalog.now'::regproc],
+    'pg_class'::regclass,
+    ARRAY['pg_class'::regclass, 'pg_type'::regclass],
+    'integer'::regtype,
+    ARRAY['integer'::regtype, 'text'::regtype],
+    ARRAY[1.5, 2.5]::numeric[],
+    ARRAY['A'::char(4), 'B'::char(4)],
+    'a_name'::name,
+    ARRAY['x'::name, 'y'::name],
+    ARRAY['00000000-0000-0000-0000-000000000001'::uuid, '00000000-0000-0000-0000-000000000002'::uuid],
+    ARRAY['2024-01-02'::date, '2024-01-03'::date],
+    ARRAY['2024-01-02 03:04:05'::timestamp, '2024-01-03 04:05:06'::timestamp],
+    ARRAY['2024-01-02 03:04:05+00'::timestamptz, '2024-01-03 04:05:06+00'::timestamptz],
+    'happy'::"{{schema}}".mood,
+    '12:34:56'::time,
+    '1 day 02:03:04'::interval,
+    '192.0.2.1'::inet,
+    '192.0.2.0/24'::cidr,
+    '08:00:2b:01:02:03'::macaddr,
+    B'1010'::bit(4),
+    '[1,5)'::int4range,
+    42::"{{schema}}".positive_int,
+    ROW(1, 2)::"{{schema}}".pair,
+    ST_GeomFromText('POINT(11.5 48.1)', 4326)
+);
+
+CREATE TABLE "{{schema}}".array_edge_cases (
+    id bigint PRIMARY KEY,
+    empty_int_array int4[],
+    null_int_array int4[],
+    int_array_with_null int4[],
+    text_array_with_null text[],
+    multi_int_array int4[],
+    geom geometry(Point, 4326)
+);
+
+INSERT INTO "{{schema}}".array_edge_cases VALUES (
+    1,
+    '{}'::int4[],
+    NULL,
+    ARRAY[1, NULL, 3],
+    ARRAY['a', NULL, 'b'],
+    ARRAY[[1, 2], [3, 4]],
+    ST_GeomFromText('POINT(11.5 48.1)', 4326)
+);

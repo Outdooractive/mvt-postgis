@@ -538,59 +538,114 @@ public final class MVTPostgis: Sendable {
                     for field in row {
                         guard field.columnName != geometryColumn else { continue }
 
-                        switch field.dataType {
-                        case .bpchar, .text, .varchar:
-                            properties[field.columnName] = row[data: field.columnName].string
+                        let data = row[data: field.columnName]
 
-                        case .textArray, .varcharArray:
-                            if let array = row[data: field.columnName].array {
+                        switch field.dataType {
+                        case .bpchar, .name, .text, .varchar:
+                            properties[field.columnName] = data.string
+
+                        case .bpcharArray, .nameArray, .textArray, .varcharArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .uuid:
-                            properties[field.columnName] = row[data: field.columnName].string
+                            properties[field.columnName] = data.string
 
                         case .uuidArray:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(\.string)
+                            }
+
+                        case .json, .jsonb:
+                            properties[field.columnName] = Self.jsonString(from: data)
+
+                        case .jsonArray, .jsonbArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.jsonString(from:))
+                            }
+
+                        case .bytea:
+                            properties[field.columnName] = Self.base64String(from: data)
+
+                        case .byteaArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.base64String(from:))
+                            }
+
+                        case .xml:
+                            properties[field.columnName] = Self.textString(from: data)
+
+                        case .xmlArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.textString(from:))
+                            }
+
+                        case .money:
+                            properties[field.columnName] = data.string
+
+                        case .moneyArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.string)
                             }
 
                         case .int2, .int4, .int8:
-                            properties[field.columnName] = row[data: field.columnName].int
+                            properties[field.columnName] = data.int
 
                         case .int2Array, .int4Array, .int8Array:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.int)
                             }
 
-                        case .float4, .float8, .numeric:
-                            properties[field.columnName] = row[data: field.columnName].double
+                        case .oid, .regproc:
+                            properties[field.columnName] = data.int
 
-                        case .float4Array, .float8Array:
-                            if let array = row[data: field.columnName].array {
+                        case .regprocArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(\.int)
+                            }
+
+                        case .regclass, .regtype:
+                            properties[field.columnName] = Self.oidInt(from: data)
+
+                        case .regclassArray, .regtypeArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.oidInt(from:))
+                            }
+
+                        case .float4, .float8, .numeric:
+                            properties[field.columnName] = data.double
+
+                        case .float4Array, .float8Array, .numericArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.double)
                             }
 
                         case .bool:
-                            properties[field.columnName] = row[data: field.columnName].bool
+                            properties[field.columnName] = data.bool
 
                         case .boolArray:
-                            if let array = row[data: field.columnName].array {
+                            if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.bool)
                             }
 
                         case .date, .timestamp, .timestamptz:
-                            properties[field.columnName] = row[data: field.columnName].date?.ISO8601Format()
+                            properties[field.columnName] = data.date?.ISO8601Format()
 
                         case .dateArray, .timestampArray, .timestamptzArray:
-                            if let array = row[data: field.columnName].array {
-                                properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format })
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format() })
                             }
 
                         default:
-                            // select * from pg_type where oid = ?;
-                            // Please open an issue if you need more
-                            logger.debug("\(externalName ?? source.name): Unknown type OID \(field.dataType.rawValue) for column '\(field.columnName)' in layer '\(layer.id)'")
+                            if field.dataType.isUserDefined,
+                               let string = Self.userDefinedString(from: data)
+                            {
+                                properties[field.columnName] = string
+                            }
+                            else {
+                                logger.debug("\(externalName ?? source.name): Unsupported type OID \(field.dataType.rawValue) for column '\(field.columnName)' in layer '\(layer.id)'")
+                            }
                         }
                     }
 
@@ -653,6 +708,67 @@ public final class MVTPostgis: Sendable {
 
         // Features will be projected to EPSG:4326
         return (features.items, MVTLayerPerformanceData(runtime: runtime.item, wkbBytes: wkbBytes.item, features: features.count, invalidFeatures: invalidFeatures.item, sqlQuery: query))
+    }
+
+    // MARK: - Property decoding
+
+    /// Returns the elements of a zero- or one-dimensional PostgreSQL array.
+    ///
+    /// `PostgresData.array` does not support multi-dimensional arrays. Reading
+    /// one can produce corrupt elements or trip its internal assertion, so
+    /// reject those arrays before decoding them.
+    private static func oneDimensionalArray(from data: PostgresData) -> [PostgresData]? {
+        guard var buffer = data.value,
+              let dimensions = buffer.readInteger(as: UInt32.self),
+              dimensions <= 1
+        else { return nil }
+
+        return data.array
+    }
+
+    /// Decodes a `json` or `jsonb` value to its JSON text representation.
+    private static func jsonString(from data: PostgresData) -> String? {
+        guard var buffer = data.value, buffer.readableBytes > 0 else { return nil }
+
+        if data.type == .jsonb {
+            buffer.moveReaderIndex(forwardBy: 1)
+        }
+
+        return String(decoding: buffer.readableBytesView, as: UTF8.self)
+    }
+
+    /// Decodes a text-encoded value such as `xml` to a string.
+    private static func textString(from data: PostgresData) -> String? {
+        guard let buffer = data.value else { return nil }
+
+        return String(decoding: buffer.readableBytesView, as: UTF8.self)
+    }
+
+    /// Encodes a binary value such as `bytea` as base64.
+    private static func base64String(from data: PostgresData) -> String? {
+        guard let bytes = data.bytes else { return nil }
+
+        return Data(bytes).base64EncodedString()
+    }
+
+    /// Reads an OID-backed value such as `regclass` or `regtype`.
+    private static func oidInt(from data: PostgresData) -> Int? {
+        guard var buffer = data.value,
+              buffer.readableBytes == 4,
+              let value = buffer.readInteger(as: UInt32.self)
+        else { return nil }
+
+        return Int(exactly: value)
+    }
+
+    /// Decodes text-like user-defined types (enums, citext, ltree) and rejects
+    /// binary values from domains, composites or hstore that are not text.
+    private static func userDefinedString(from data: PostgresData) -> String? {
+        guard let string = data.string,
+              string.rangeOfCharacter(from: .controlCharacters) == nil
+        else { return nil }
+
+        return string
     }
 
 }
