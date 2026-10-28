@@ -231,4 +231,77 @@ struct ConnectionPoolIntegrationTests {
         }
     }
 
+    @Test(.timeLimit(.minutes(2)))
+    func poolInfosReportsActiveAndWaitingRequests() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = layer(
+                fixture,
+                sql: """
+                (SELECT f.id, f.name, f.kind, f.geom
+                 FROM "\(fixture.schema)".features f,
+                      LATERAL (SELECT pg_sleep(2)) sleep
+                 WHERE f.id = 1) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(poolSize: 1))
+            { postgis in
+                let running = Task {
+                    try await postgis.vectorTile(forTile: Self.tile)
+                }
+                try await Task.sleep(for: .milliseconds(300))
+
+                let active = await postgis.poolInfos().first
+                #expect(active?.activeConnections == 1)
+                #expect(active?.connections.first?.batchId != nil)
+                #expect(active?.connections.first?.query?.contains("pg_sleep") == true)
+
+                let waiting = Task {
+                    try await postgis.vectorTile(forTile: Self.tile)
+                }
+                try await Task.sleep(for: .milliseconds(300))
+
+                let queued = await postgis.poolInfos().first
+                #expect(queued?.waitingRequests == 1)
+
+                waiting.cancel()
+                _ = try await running.value
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func parallelValidateAndCloseIdleConnections() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = layer(
+                fixture,
+                sql: """
+                (SELECT f.id, f.name, f.kind, f.geom
+                 FROM "\(fixture.schema)".features f,
+                      LATERAL (SELECT pg_sleep(2)) sleep
+                 WHERE f.id = 1) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(poolSize: 2))
+            { postgis in
+                let running = Task {
+                    try await postgis.vectorTile(forTile: Self.tile)
+                }
+                try await Task.sleep(for: .milliseconds(300))
+
+                let error = await postgis.validate(
+                    sql: "SELECT 1",
+                    forLayer: layer)
+                #expect(error == nil)
+
+                await postgis.closeIdleConnections()
+                let result = try await running.value
+                #expect(result.tile.features(for: "pool").count == 1)
+            }
+        }
+    }
+
 }
