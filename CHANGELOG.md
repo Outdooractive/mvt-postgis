@@ -43,6 +43,9 @@ and this project adheres to semantic versioning.
   to an unsigned MVT ID.
 - CI and the local integration runner now use PostgreSQL 18 / PostGIS 3.6,
   the minimum supported production version.
+- Updated `PostgresConnectionPool` to 1.1.1. A connection that finishes
+  opening while a pool is shutting down is now closed and discarded instead of
+  leaking and trapping in PostgresNIO on release.
 - Updated to `mvt-tools` 3.0.0-beta.5, `gis-tools` 3.0.0-beta.5,
   `gis-tools-csv` 3.0.0-beta.6 and `postgres-nio` 1.33.2.
 - Added direct `swift-log` and `swift-atomics` dependencies and removed the
