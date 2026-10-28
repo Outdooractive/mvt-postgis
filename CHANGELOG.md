@@ -44,6 +44,9 @@ and this project adheres to semantic versioning.
 - Connection-pool concurrency coverage for a single-connection pool, shared
   pools across layers, cancellation of a waiting request, shutdown with an
   in-flight request and authentication failures.
+- MVT/MLT export-option coverage for all supported geometries, buffers,
+  compression levels, simplification, feature IDs/properties, empty output and
+  deterministic decoded results.
 
 ### Changed
 
