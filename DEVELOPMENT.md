@@ -19,6 +19,29 @@ scripts/run-coverage.sh 90
 The script runs all tests, uses the generated profdata directly and enforces the
 line-coverage gate.
 
+## PostgreSQL/PostGIS support matrix
+
+| PostgreSQL | PostGIS | Status |
+| --- | --- | --- |
+| 18.x | 3.6.x | Supported and exercised in CI |
+| < 18 | any | Unsupported |
+
+PostgreSQL 18 / PostGIS 3.6 is the minimum supported baseline. Older server
+majors and PostGIS releases are not tested and are not supported.
+
+CI runs the coverage and integration suite against
+`postgis/postgis:18-3.6`. The workflow can be dispatched manually with a
+different `postgis_image` input, and the local runner accepts the same override:
+
+```bash
+MVT_POSTGIS_TEST_IMAGE=postgis/postgis:18-3.6 scripts/run-integration-tests.sh
+```
+
+The integration tests use PostgreSQL's binary protocol and do not depend on
+`DateStyle`, `IntervalStyle`, `TimeZone` or locale for decoding correctness.
+The environment suite exercises session-level `TimeZone`, `DateStyle`,
+`IntervalStyle` and `extra_float_digits` settings explicitly.
+
 ## PostGIS integration tests
 
 The integration suite uses a real PostGIS database and deterministic SQL
