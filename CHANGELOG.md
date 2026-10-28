@@ -41,6 +41,9 @@ and this project adheres to semantic versioning.
 - End-to-end configuration coverage for clipping/simplification/validation
   combinations, buffer sizes, zoom-dependent closures, layer bounds, runtime
   tracking, feature mapping and export buffers.
+- Connection-pool concurrency coverage for a single-connection pool, shared
+  pools across layers, cancellation of a waiting request, shutdown with an
+  in-flight request and authentication failures.
 
 ### Changed
 
