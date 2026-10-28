@@ -15,7 +15,9 @@ INSERT INTO "{{schema}}".features (id, name, kind, geom) VALUES
     (4, 'multi', 'multipolygon', ST_GeomFromText('MULTIPOLYGON(((11.40 48.00, 11.45 48.00, 11.45 48.05, 11.40 48.05, 11.40 48.00)), ((11.55 48.15, 11.60 48.15, 11.60 48.20, 11.55 48.20, 11.55 48.15)))', 4326)),
     (5, 'collection', 'geometrycollection', ST_GeomFromText('GEOMETRYCOLLECTION(POINT(11.5 48.1), LINESTRING(11.4 48.0, 11.6 48.2))', 4326)),
     (6, 'null', 'point', NULL),
-    (7, 'invalid', 'polygon', ST_GeomFromText('POLYGON((11.40 48.00, 11.60 48.20, 11.60 48.00, 11.40 48.20, 11.40 48.00))', 4326));
+    (7, 'invalid', 'polygon', ST_GeomFromText('POLYGON((11.40 48.00, 11.60 48.20, 11.60 48.00, 11.40 48.20, 11.40 48.00))', 4326)),
+    (8, 'multipoint', 'multipoint', ST_GeomFromText('MULTIPOINT((11.5 48.1), (11.6 48.2))', 4326)),
+    (9, 'multilinestring', 'multilinestring', ST_GeomFromText('MULTILINESTRING((11.4 48.0, 11.5 48.1), (11.55 48.15, 11.6 48.2))', 4326));
 
 CREATE TABLE "{{schema}}".property_types (
     id bigint PRIMARY KEY,
@@ -272,3 +274,14 @@ INSERT INTO "{{schema}}".array_edge_cases VALUES (
     ARRAY[[1, 2], [3, 4]],
     ST_GeomFromText('POINT(11.5 48.1)', 4326)
 );
+
+CREATE TABLE "{{schema}}".geography_features (
+    id bigint PRIMARY KEY,
+    name text,
+    geom geography
+);
+
+INSERT INTO "{{schema}}".geography_features (id, name, geom) VALUES
+    (1, 'point', ST_GeogFromText('POINT(11.5 48.1)')),
+    (2, 'line', ST_GeogFromText('LINESTRING(11.4 48.0, 11.6 48.2)')),
+    (3, 'polygon', ST_GeogFromText('POLYGON((11.4 48.0, 11.6 48.0, 11.6 48.2, 11.4 48.2, 11.4 48.0))'));
