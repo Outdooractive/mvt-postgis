@@ -994,10 +994,11 @@ struct PostGISIntegrationTests {
 
                 for tile in [mvtTile, mltTile] {
                     #expect(tile.features(for: "point").first?.geometry is Point)
-                    #expect(tile.features(for: "multipoint").first?.geometry is MultiPoint)
+                    #expect((tile.features(for: "multipoint").first?.geometry as? MultiPoint)?.coordinates.count == 2)
                     #expect(tile.features(for: "linestring").first?.geometry is LineString)
-                    #expect(tile.features(for: "multilinestring").first?.geometry is MultiLineString)
+                    #expect((tile.features(for: "multilinestring").first?.geometry as? MultiLineString)?.coordinates.count == 2)
                     #expect(tile.features(for: "polygon").first?.geometry is Polygon)
+                    #expect((tile.features(for: "polygon").first?.geometry as? Polygon)?.coordinates.first?.count == 5)
                     #expect((tile.features(for: "polygon_hole").first?.geometry as? Polygon)?.coordinates.count == 2)
                     #expect((tile.features(for: "multipolygon").first?.geometry as? MultiPolygon)?.polygons.count == 2)
                     #expect(tile.features(for: "point_z").first?.geometry is Point)
