@@ -13,6 +13,13 @@ The SQL query and field/geometry names come from the source configuration. The
 library quotes identifiers, but it does not sanitize or restrict the SQL
 expression. Treat source files as trusted configuration.
 
+The Mapnik placeholders `!bbox!`, `!scale_denominator!` and `!pixel_width!` are
+replaced textually, including when they appear inside string literals or
+comments. A trailing semicolon on the datasource SQL is ignored.
+
+Layer queries run in read-only sessions. `INSERT`, `UPDATE`, `DELETE`, DDL and
+`SELECT ... FOR UPDATE` are rejected by PostgreSQL.
+
 ## Simplification units
 
 Simplification tolerances are configured in metres. For planar projections

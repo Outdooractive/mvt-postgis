@@ -3,6 +3,7 @@ import GISTools
 @testable import MVTPostgis
 import MVTTools
 import PostgresConnectionPool
+import PostgresNIO
 import Testing
 
 @Suite(.serialized, .enabled(if: IntegrationEnvironment.isAvailable))
@@ -181,10 +182,14 @@ struct PostGISIntegrationTests {
         simplification: MVTSimplificationOption = .none,
         validation: MVTMakeValidOption = .none,
         trackRuntimes: Bool = false,
+        connectTimeout: TimeInterval = 5.0,
+        queryTimeout: TimeInterval = 10.0,
         tileTimeout: TimeInterval = 60.0,
         featureMapping: (@Sendable (Feature) -> Feature)? = nil,
     ) -> MVTPostgisConfiguration {
         MVTPostgisConfiguration(
+            connectTimeout: connectTimeout,
+            queryTimeout: queryTimeout,
             tileTimeout: tileTimeout,
             clipping: { _, _ in clipping },
             simplification: { _, _ in simplification },
@@ -1824,6 +1829,578 @@ struct PostGISIntegrationTests {
                 // MVT/MLT encoders.
                 #expect(features.count == 7)
                 #expect(features.allSatisfy { $0.geometry?.allCoordinates.isEmpty == true })
+            }
+        }
+    }
+
+    // MARK: - SQL shapes, timeouts and database errors
+
+    private func psqlError(from error: any Error) -> PSQLError? {
+        if let error = error as? PSQLError {
+            return error
+        }
+        guard let error = error as? PoolError else { return nil }
+
+        switch error {
+        case let .postgresError(psqlError):
+            return psqlError
+        case let .poolDestroyed(psqlError):
+            return psqlError
+        case .cancelled, .connectionFailed, .queryCancelled, .unknown:
+            return nil
+        }
+    }
+
+    private func sqlState(of error: any Error) -> String? {
+        psqlError(from: error)?.serverInfo?[.sqlState]
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func handlesQueryShapes() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let schema = fixture.schema
+
+            func layer(_ id: String, _ sql: String, extraFields: [String: String] = [:]) -> PostgisLayer {
+                var fields = ["id": "", "name": "", "kind": "", "geom": ""]
+                fields.merge(extraFields) { current, _ in current }
+
+                return fixture.layer(
+                    id: id,
+                    table: "features",
+                    fields: fields,
+                    srid: .epsg4326,
+                    sql: sql)
+            }
+
+            let layers = [
+                layer("empty", "(SELECT * FROM \"\(schema)\".features WHERE false) AS data"),
+                layer("limit", "(SELECT * FROM \"\(schema)\".features LIMIT 0) AS data"),
+                layer("repeated", "(SELECT * FROM \"\(schema)\".features WHERE geom && !bbox! AND geom && !bbox!) AS data"),
+                layer("cte", "(WITH d AS (SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!) SELECT * FROM d) AS data"),
+                layer("union", "(SELECT * FROM \"\(schema)\".features WHERE id = 1 UNION ALL SELECT * FROM \"\(schema)\".features WHERE id = 2) AS data"),
+                layer("nested", "(SELECT * FROM (SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!) AS inner_data) AS data"),
+                layer("values", "(SELECT * FROM (VALUES (1, 'v', 'point', ST_GeomFromText('POINT(11.5 48.1)', 4326))) AS v(id, name, kind, geom)) AS data"),
+                layer("lateral", "(SELECT f.* FROM \"\(schema)\".features f, LATERAL (SELECT 1) l WHERE f.geom && !bbox!) AS data"),
+                layer("alias-spaces", "(SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!) AS \"data alias\""),
+                layer("no-alias", "(SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!)"),
+                layer("trailing", "(SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!);"),
+                layer("literal", "(SELECT *, '!bbox!' AS literal FROM \"\(schema)\".features LIMIT 1) AS data", extraFields: ["literal": ""]),
+                layer("comment", "(SELECT * FROM \"\(schema)\".features -- !bbox!\n LIMIT 1) AS data"),
+            ]
+
+            try await withPostgis(
+                fixture.source(layers: layers),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+
+                func count(_ id: String) -> Int {
+                    result.tile.features(for: id).count
+                }
+
+                #expect(count("empty") == 0)
+                #expect(count("limit") == 0)
+                #expect(count("repeated") == 8)
+                #expect(count("cte") == 8)
+                #expect(count("union") == 2)
+                #expect(count("nested") == 8)
+                #expect(count("values") == 1)
+                #expect(count("lateral") == 8)
+                #expect(count("alias-spaces") == 8)
+                #expect(count("no-alias") == 8)
+                #expect(count("trailing") == 8)
+                #expect(count("comment") == 1)
+
+                let literal = try #require(result.tile.features(for: "literal").first?.properties["literal"] as? String)
+                #expect(literal.contains("ST_MakeEnvelope("))
+                #expect(literal.contains("!bbox!") == false)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func handlesQuotedAndReservedIdentifiers() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "quoted",
+                table: "geometry_column_edge_cases",
+                fields: ["MixedCase": "", "select": "", "geometry": ""],
+                srid: .epsg4326,
+                geometryField: "geometry",
+                sql: """
+                (SELECT id AS "MixedCase", name AS "select", geometry
+                 FROM "\(fixture.schema)".geometry_column_edge_cases) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = try #require(result.tile.features(for: "quoted").first)
+
+                #expect(feature.properties["MixedCase"] as? Int == 1)
+                #expect(feature.properties["select"] as? String == "all-columns")
+                #expect(feature.geometry is Point)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func queryTimeoutIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "slow",
+                table: "features",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT f.id, f.name, f.kind, f.geom
+                 FROM "\(fixture.schema)".features f,
+                      LATERAL (SELECT pg_sleep(5)) sleep
+                 WHERE f.geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(queryTimeout: 1.0, tileTimeout: 30.0))
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected a query timeout")
+                }
+                catch {
+                    if let error = psqlError(from: error) {
+                        #expect(error.code == .queryCancelled || sqlState(of: error) == "57014")
+                    }
+                    else if let error = error as? PoolError, case .queryCancelled = error {
+                        // Expected.
+                    }
+                    else {
+                        Issue.record("Expected a query timeout, got \(error)")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func multipleLayerTileTimeoutReportsAllQueries() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            func slowLayer(_ id: String) -> PostgisLayer {
+                fixture.layer(
+                    id: id,
+                    table: "features",
+                    fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                    srid: .epsg4326,
+                    sql: """
+                    (SELECT f.id, f.name, f.kind, f.geom
+                     FROM "\(fixture.schema)".features f,
+                          LATERAL (SELECT pg_sleep(5)) sleep
+                     WHERE f.geom && !bbox!) AS data
+                    """)
+            }
+
+            try await withPostgis(
+                fixture.source(layers: [slowLayer("slow-a"), slowLayer("slow-b")]),
+                configuration: configuration(tileTimeout: 1.0))
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected a tile timeout")
+                }
+                catch let error as MVTPostgisError {
+                    guard case let .tileTimedOut(queries) = error else {
+                        Issue.record("Expected tileTimedOut, got \(error)")
+                        return
+                    }
+
+                    #expect(queries.count == 2)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func databaseErrorsAreReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let schema = fixture.schema
+            let cases: [(String, String, String)] = [
+                ("missing-table", "(SELECT * FROM \"\(schema)\".does_not_exist) AS data", "42P01"),
+                ("missing-column", "(SELECT id, does_not_exist, geom FROM \"\(schema)\".features) AS data", "42703"),
+                ("syntax", "(SELEC * FROM \"\(schema)\".features) AS data", "42601"),
+                ("divide", "(SELECT id, name, kind, geom FROM \"\(schema)\".features WHERE 1 / 0 = 0) AS data", "22012"),
+            ]
+
+            for (id, sql, expectedState) in cases {
+                let layer = fixture.layer(
+                    id: id,
+                    table: "features",
+                    fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                    srid: .epsg4326,
+                    sql: sql)
+
+                try await withPostgis(
+                    fixture.source(layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    do {
+                        _ = try await postgis.vectorTile(forTile: Self.tile)
+                        Issue.record("Expected an error for \(id)")
+                    }
+                    catch {
+                        #expect(sqlState(of: error) == expectedState, "\(id): \(error)")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func readOnlySessionsRejectWrites() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let schema = fixture.schema
+            let writes = [
+                "(WITH w AS (INSERT INTO \"\(schema)\".features (id, name, kind, geom) VALUES (99, 'x', 'point', ST_GeomFromText('POINT(11.5 48.1)', 4326)) RETURNING *) SELECT * FROM w) AS data",
+                "(WITH w AS (UPDATE \"\(schema)\".features SET name = 'x' RETURNING *) SELECT * FROM w) AS data",
+                "(WITH w AS (DELETE FROM \"\(schema)\".features RETURNING *) SELECT * FROM w) AS data",
+                "(SELECT * FROM \"\(schema)\".features FOR UPDATE) AS data",
+            ]
+
+            for (index, sql) in writes.enumerated() {
+                let layer = fixture.layer(
+                    id: "write-\(index)",
+                    table: "features",
+                    fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                    srid: .epsg4326,
+                    sql: sql)
+
+                try await withPostgis(
+                    fixture.source(layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    do {
+                        _ = try await postgis.vectorTile(forTile: Self.tile)
+                        Issue.record("Expected a read-only error")
+                    }
+                    catch {
+                        // Data-modifying statements cannot be used as a
+                        // subquery, so they are rejected before the read-only
+                        // check; SELECT ... FOR UPDATE reaches the read-only
+                        // transaction guard.
+                        let state = sqlState(of: error)
+                        #expect(state == "25006" || state == "0A000" || state == "42601")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func validatesQueryShapesAndErrors() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "features",
+                table: "features",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let schema = fixture.schema
+                let valid = [
+                    "(SELECT * FROM \"\(schema)\".features WHERE geom && !bbox!) AS data",
+                    "SELECT * FROM \"\(schema)\".features",
+                    "WITH d AS (SELECT * FROM \"\(schema)\".features) SELECT * FROM d",
+                    "SELECT * FROM \"\(schema)\".features WHERE geom && !bbox! AND geom && !bbox!",
+                    "SELECT '!bbox!' AS literal",
+                    "SELECT * FROM \"\(schema)\".features;",
+                ]
+
+                for sql in valid {
+                    let error = await postgis.validate(sql: sql, forLayer: layer)
+                    #expect(error == nil, "\(sql): \(error ?? "")")
+                }
+
+                let missingTable = await postgis.validate(
+                    sql: "SELECT * FROM \"\(schema)\".does_not_exist",
+                    forLayer: layer)
+                #expect(missingTable?.contains("does_not_exist") == true)
+
+                let missingColumn = await postgis.validate(
+                    sql: "SELECT does_not_exist FROM \"\(schema)\".features",
+                    forLayer: layer)
+                #expect(missingColumn?.contains("does_not_exist") == true)
+
+                let syntax = await postgis.validate(
+                    sql: "SELEC * FROM \"\(schema)\".features",
+                    forLayer: layer)
+                #expect(syntax != nil)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func permissionDeniedIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let role = "mvt_restricted_\(fixture.schema.suffix(8))"
+            let password = "restricted"
+            let schema = fixture.schema
+            let database = IntegrationEnvironment.databaseName
+
+            try await fixture.database.execute("CREATE ROLE \"\(role)\" LOGIN PASSWORD '\(password)'")
+            try await fixture.database.execute("GRANT CONNECT ON DATABASE \"\(database)\" TO \"\(role)\"")
+            try await fixture.database.execute("GRANT USAGE ON SCHEMA \"\(schema)\" TO \"\(role)\"")
+
+            let datasource = PostgisDatasource(
+                user: role,
+                password: password,
+                host: IntegrationEnvironment.host ?? "127.0.0.1",
+                port: IntegrationEnvironment.port,
+                databaseName: database,
+                srid: .epsg4326,
+                type: "postgis",
+                sql: "(SELECT * FROM \"\(schema).features\") AS data")
+            let layer = PostgisLayer(
+                id: "restricted",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                datasource: datasource)
+
+            do {
+                try await withPostgis(
+                    PostgisSource(name: "Restricted", layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    do {
+                        _ = try await postgis.vectorTile(forTile: Self.tile)
+                        Issue.record("Expected permission denied")
+                    }
+                    catch {
+                        // PostgreSQL hides a table the role cannot access behind
+                        // "relation does not exist"; a direct privilege error is
+                        // also possible depending on grants.
+                        let state = sqlState(of: error)
+                        #expect(state == "42501" || state == "42P01")
+                    }
+                }
+            }
+            catch {
+                Issue.record("Unexpected setup error: \(error)")
+            }
+
+            try? await fixture.database.execute("REVOKE ALL ON SCHEMA \"\(schema)\" FROM \"\(role)\"")
+            try? await fixture.database.execute("DROP OWNED BY \"\(role)\"")
+            try? await fixture.database.execute("DROP ROLE \"\(role)\"")
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func missingDatabaseIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let datasource = PostgisDatasource(
+                user: IntegrationEnvironment.user,
+                password: IntegrationEnvironment.password,
+                host: IntegrationEnvironment.host ?? "127.0.0.1",
+                port: IntegrationEnvironment.port,
+                databaseName: "mvt_missing_\(UUID().uuidString.replacing("-", with: ""))",
+                srid: .epsg4326,
+                type: "postgis",
+                sql: "(SELECT 1 AS id, 'x' AS name, 'point' AS kind, NULL::geometry AS geom) AS data")
+            let layer = PostgisLayer(
+                id: "missing-db",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                datasource: datasource)
+
+            try await withPostgis(
+                PostgisSource(name: "Missing", layers: [layer]),
+                configuration: configuration(connectTimeout: 1.0))
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected a missing database error")
+                }
+                catch {
+                    let state = sqlState(of: error)
+                    #expect(state == "3D000" || String(reflecting: error).contains("does not exist"))
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func missingPostGISExtensionIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let database = "mvt_no_postgis_\(UUID().uuidString.replacing("-", with: ""))"
+            try await fixture.database.execute("CREATE DATABASE \"\(database)\"")
+
+            let datasource = PostgisDatasource(
+                user: IntegrationEnvironment.user,
+                password: IntegrationEnvironment.password,
+                host: IntegrationEnvironment.host ?? "127.0.0.1",
+                port: IntegrationEnvironment.port,
+                databaseName: database,
+                srid: .epsg4326,
+                type: "postgis",
+                sql: "(SELECT 1 AS id, 'x' AS name, 'point' AS kind, 1 AS geom) AS data")
+            let layer = PostgisLayer(
+                id: "no-postgis",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                datasource: datasource)
+
+            do {
+                try await withPostgis(
+                    PostgisSource(name: "NoPostGIS", layers: [layer]),
+                    configuration: configuration(connectTimeout: 1.0))
+                { postgis in
+                    do {
+                        _ = try await postgis.vectorTile(forTile: Self.tile)
+                        Issue.record("Expected a missing PostGIS error")
+                    }
+                    catch {
+                        // Without PostGIS the geometry type or the ST_* function
+                        // is missing.
+                        let state = sqlState(of: error)
+                        #expect(state == "42883" || state == "42704")
+                    }
+                }
+            }
+            catch {
+                Issue.record("Unexpected setup error: \(error)")
+            }
+
+            try? await fixture.database.execute("DROP DATABASE \"\(database)\"")
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func connectTimeoutIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let datasource = PostgisDatasource(
+                user: IntegrationEnvironment.user,
+                password: IntegrationEnvironment.password,
+                host: "192.0.2.1",
+                port: 5432,
+                databaseName: IntegrationEnvironment.databaseName,
+                srid: .epsg4326,
+                type: "postgis",
+                sql: "(SELECT 1 AS id, 'x' AS name, 'point' AS kind, NULL::geometry AS geom) AS data")
+            let layer = PostgisLayer(
+                id: "unreachable",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                datasource: datasource)
+
+            try await withPostgis(
+                PostgisSource(name: "Unreachable", layers: [layer]),
+                configuration: configuration(connectTimeout: 1.0))
+            { postgis in
+                do {
+                    _ = try await postgis.vectorTile(forTile: Self.tile)
+                    Issue.record("Expected a connection timeout")
+                }
+                catch {
+                    // The pool reports a connection failure; the exact
+                    // underlying error is platform-dependent.
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func statementCancelFromAnotherSessionIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "cancellable",
+                table: "features",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT f.id, f.name, f.kind, f.geom
+                 FROM "\(fixture.schema)".features f,
+                      LATERAL (SELECT pg_sleep(10)) sleep
+                 WHERE f.geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(queryTimeout: 30.0, tileTimeout: 60.0))
+            { postgis in
+                let task = Task {
+                    try await postgis.vectorTile(forTile: Self.tile)
+                }
+
+                try await Task.sleep(for: .seconds(1))
+
+                let cancelled = try await fixture.database.queryInt("""
+                SELECT pg_cancel_backend(pid)::int AS value
+                FROM pg_stat_activity
+                WHERE query LIKE '%pg_sleep(10)%'
+                  AND pid <> pg_backend_pid()
+                LIMIT 1
+                """)
+                #expect(cancelled == 1)
+
+                do {
+                    _ = try await task.value
+                    Issue.record("Expected the query to be cancelled")
+                }
+                catch {
+                    let state = sqlState(of: error)
+                    let isPoolCancellation = (error as? PoolError).map {
+                        if case .queryCancelled = $0 {
+                            return true
+                        }
+                        return false
+                    } ?? false
+                    #expect(state == "57014" || isPoolCancellation || error is CancellationError, "\(String(reflecting: error))")
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func connectionLossDuringStreamingIsReported() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "terminated",
+                table: "features",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT f.id, f.name, f.kind, f.geom
+                 FROM "\(fixture.schema)".features f,
+                      LATERAL (SELECT pg_sleep(10)) sleep
+                 WHERE f.geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration(queryTimeout: 30.0, tileTimeout: 60.0))
+            { postgis in
+                let task = Task {
+                    try await postgis.vectorTile(forTile: Self.tile)
+                }
+
+                try await Task.sleep(for: .seconds(1))
+
+                let terminated = try await fixture.database.queryInt("""
+                SELECT pg_terminate_backend(pid)::int AS value
+                FROM pg_stat_activity
+                WHERE query LIKE '%pg_sleep(10)%'
+                  AND pid <> pg_backend_pid()
+                LIMIT 1
+                """)
+                #expect(terminated == 1)
+
+                do {
+                    _ = try await task.value
+                    Issue.record("Expected a connection loss")
+                }
+                catch {
+                    // The pool surfaces the closed connection as an error; the
+                    // exact wrapper depends on where the stream stopped.
+                }
             }
         }
     }

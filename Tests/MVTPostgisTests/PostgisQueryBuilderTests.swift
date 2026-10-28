@@ -129,6 +129,20 @@ struct PostgisQueryBuilderTests {
     }
 
     @Test
+    func stripsTrailingSemicolonsFromSQL() {
+        let builder = PostgisQueryBuilder(
+            layer: layer(sql: "(SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places;"),
+            envelope: "ENVELOPE",
+            simplificationTolerance: 2.5,
+            clipping: .none,
+            simplification: .none,
+            validation: .none)
+
+        #expect(builder.sql == "(SELECT name, geometry FROM places WHERE geometry && !bbox!) AS places")
+        #expect(builder.query.hasSuffix(";") == false)
+    }
+
+    @Test
     func identifierQuotingEscapesEmbeddedQuotes() {
         #expect(PostgisQueryBuilder.quotedIdentifier("geometry") == "\"geometry\"")
         #expect(PostgisQueryBuilder.quotedIdentifier(#"a"b"#) == #""a""b""#)
