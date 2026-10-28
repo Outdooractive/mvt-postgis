@@ -47,6 +47,8 @@ and this project adheres to semantic versioning.
 - MVT/MLT export-option coverage for all supported geometries, buffers,
   compression levels, simplification, feature IDs/properties, empty output and
   deterministic decoded results.
+- Seeded generative tests for WKB and MVT/MLT invariants, malformed WKB and
+  source documents, and arbitrary SQL fragments.
 
 ### Changed
 
