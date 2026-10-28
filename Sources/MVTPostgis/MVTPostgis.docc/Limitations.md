@@ -177,3 +177,7 @@ Transient database failures fail the current request and keep the pool alive;
 the next request retries after the connection cooldown. A pool permanently shut
 down by an authentication, TLS or database-name error is recreated only when a
 TCP probe succeeds, so an outage cannot trigger an unbounded number of pools.
+
+After an administrative termination of every backend, call `shutdown()` before
+issuing more requests; the next request creates a fresh pool. Automatic
+recovery from that state (without an explicit shutdown) is not guaranteed.

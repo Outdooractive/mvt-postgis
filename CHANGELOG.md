@@ -52,6 +52,8 @@ and this project adheres to semantic versioning.
 - `MVTPostgisConfiguration.flattenGeometryCollections` flattens nested
   `GeometryCollection`s into one feature per member before clipping and
   encoding, preserving their properties, foreign members and IDs.
+- Coverage for administrative backend termination followed by an explicit
+  `shutdown()` and pool recreation.
 
 ### Changed
 
