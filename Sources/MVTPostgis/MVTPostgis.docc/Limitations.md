@@ -61,6 +61,13 @@ PostgresNIO's array decoder only supports zero- and one-dimensional arrays.
 MVT and MLT quantize geometry to the tile grid. A round trip does not preserve
 altitude, GeoJSON `m` values, string feature IDs, or foreign members.
 
+## Multi-geometry round trips
+
+The in-memory `VectorTile` preserves `MultiPoint` and `MultiLineString`
+geometries. MVT/MLT encoders and decoders may flatten them to `Point` or
+`LineString` respectively; assert the decoded geometry type if your consumer
+depends on it.
+
 ## No HTTP server
 
 `MVTPostgis` creates tile data. Serving HTTP, caching, authentication, and tile

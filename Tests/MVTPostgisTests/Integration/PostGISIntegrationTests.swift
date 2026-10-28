@@ -340,6 +340,84 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
+    func loadsMultiGeometries() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "multi",
+                table: "features",
+                fields: ["id": "", "name": "", "kind": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".features
+                 WHERE id IN (8, 9) AND geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "multi")
+                let byId = Dictionary(uniqueKeysWithValues: features.compactMap { feature in
+                    (feature.id, feature)
+                })
+
+                #expect(features.count == 2)
+                #expect(byId[.int(8)]?.geometry is MultiPoint)
+                #expect(byId[.int(9)]?.geometry is MultiLineString)
+                #expect((byId[.int(8)]?.geometry as? MultiPoint)?.coordinates.count == 2)
+                #expect((byId[.int(9)]?.geometry as? MultiLineString)?.coordinates.count == 2)
+
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mlt = try await postgis.data(forTile: Self.tile, format: .mlt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
+
+                #expect(mvtTile.features(for: "multi").count == 2)
+                #expect(mltTile.features(for: "multi").count == 2)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func loadsGeographyGeometryColumn() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "geography",
+                table: "geography_features",
+                fields: ["id": "", "name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT * FROM "\(fixture.schema)".geography_features) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "geography")
+                let byId = Dictionary(uniqueKeysWithValues: features.compactMap { feature in
+                    (feature.id, feature)
+                })
+
+                #expect(features.count == 3)
+                #expect(byId[.int(1)]?.geometry is Point)
+                #expect(byId[.int(2)]?.geometry is LineString)
+                #expect(byId[.int(3)]?.geometry is Polygon)
+
+                let point = try #require(byId[.int(1)]?.geometry as? Point)
+                #expect(abs(point.coordinate.longitude - 11.5) < 0.01)
+                #expect(abs(point.coordinate.latitude - 48.1) < 0.01)
+
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                #expect(mvtTile.features(for: "geography").count == 3)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
     func skipsNullGeometry() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
