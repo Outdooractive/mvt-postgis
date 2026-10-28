@@ -125,7 +125,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `loads all geometry types`() async throws {
+    func loadsAllGeometryTypes() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "features",
@@ -169,7 +169,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `decodes property types`() async throws {
+    func decodesPropertyTypes() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "properties",
@@ -214,7 +214,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `decodes extended property types`() async throws {
+    func decodesExtendedPropertyTypes() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "extended",
@@ -293,7 +293,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `decodes array edge cases`() async throws {
+    func decodesArrayEdgeCases() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "array_edges",
@@ -321,7 +321,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `skips null geometry`() async throws {
+    func skipsNullGeometry() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "null_geometry",
@@ -344,7 +344,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `postgis clipping keeps intersecting features`() async throws {
+    func postgisClippingKeepsIntersectingFeatures() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "clip",
@@ -372,7 +372,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `local clipping rejects outside feature`() async throws {
+    func localClippingRejectsOutsideFeature() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "clip",
@@ -399,7 +399,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `simplification reduces vertices`() async throws {
+    func simplificationReducesVertices() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "simplify",
@@ -430,7 +430,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `validation makes invalid polygon valid`() async throws {
+    func validationMakesInvalidPolygonValid() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "invalid",
@@ -451,7 +451,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `per layer projection reprojects features`() async throws {
+    func perLayerProjectionReprojectsFeatures() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let geographic = fixture.layer(
                 id: "geographic",
@@ -488,7 +488,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `supports utm projection`() async throws {
+    func supportsUtmProjection() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "utm",
@@ -511,7 +511,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `validates SQL`() async throws {
+    func validatesSql() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "features",
@@ -536,7 +536,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `feature mapping and buffer are applied`() async throws {
+    func featureMappingAndBufferAreApplied() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "features",
@@ -563,7 +563,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `data round trips MVT and MLT`() async throws {
+    func dataRoundTripsMvtAndMlt() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "features",
@@ -591,7 +591,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `tile timeout is reported`() async throws {
+    func tileTimeoutIsReported() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "slow",
@@ -624,7 +624,7 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func `cancellation is reported`() async throws {
+    func cancellationIsReported() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
                 id: "slow",

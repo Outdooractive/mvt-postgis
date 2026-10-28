@@ -33,7 +33,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `rejects empty source`() {
+    func rejectsEmptySource() {
         let source = PostgisSource(name: "Empty", layers: [])
         #expect(throws: MVTPostgisError.needLayers) {
             try MVTPostgis(source: source)
@@ -41,7 +41,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `rejects empty layer id`() {
+    func rejectsEmptyLayerId() {
         let source = source(id: "")
         #expect(throws: MVTPostgisError.invalidLayerId) {
             try MVTPostgis(source: source)
@@ -49,7 +49,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `rejects non postgis datasource`() {
+    func rejectsNonPostgisDatasource() {
         let source = source(type: "mysql")
         #expect(throws: MVTPostgisError.wrongDatasourceType(message: "All datasources must be of type 'postgis'")) {
             try MVTPostgis(source: source)
@@ -57,7 +57,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `rejects unsupported projection`() {
+    func rejectsUnsupportedProjection() {
         for projection in [Projection.epsg4978, Projection.noSRID] {
             let source = source(srid: projection)
             #expect(throws: MVTPostgisError.unsupportedSRID) {
@@ -67,7 +67,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `accepts mixed planar and geographic layer projections`() throws {
+    func acceptsMixedPlanarAndGeographicLayerProjections() throws {
         let source = PostgisSource(
             name: "Mixed",
             layers: [
@@ -83,7 +83,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `public initializers preserve values`() {
+    func publicInitializersPreserveValues() {
         let properties = PostgisLayer.Properties(bufferSize: -5)
         #expect(properties.bufferSize == 0)
 
@@ -116,7 +116,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `convenience init from source data`() throws {
+    func convenienceInitFromSourceData() throws {
         let json = """
         {
           "name": "Data",
@@ -141,7 +141,7 @@ struct MVTPostgisInitializationTests {
     }
 
     @Test
-    func `convenience init from source URL`() throws {
+    func convenienceInitFromSourceUrl() throws {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("mvt-postgis-source-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }

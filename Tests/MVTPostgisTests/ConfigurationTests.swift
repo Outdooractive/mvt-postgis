@@ -5,7 +5,7 @@ import Testing
 struct MVTPostgisConfigurationTests {
 
     @Test
-    func `configuration defaults`() {
+    func configurationDefaults() {
         let config = MVTPostgisConfiguration()
         #expect(config.applicationName == "MVTPostgis")
         #expect(config.connectTimeout == 5.0)
@@ -18,7 +18,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func `configuration custom values`() {
+    func configurationCustomValues() {
         let config = MVTPostgisConfiguration(
             applicationName: "Custom",
             connectTimeout: 3.0,
@@ -37,7 +37,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func `configuration clamps minimum values`() {
+    func configurationClampsMinimumValues() {
         let config = MVTPostgisConfiguration(
             connectTimeout: 0.1,
             queryTimeout: 0.1,
@@ -50,20 +50,20 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func `configuration disables query timeout`() {
+    func configurationDisablesQueryTimeout() {
         let config = MVTPostgisConfiguration(queryTimeout: nil)
         #expect(config.queryTimeout == nil)
     }
 
     @Test
-    func `clipping option all cases`() {
+    func clippingOptionAllCases() {
         let _: MVTClippingOption = .none
         let _: MVTClippingOption = .postgis
         let _: MVTClippingOption = .local
     }
 
     @Test
-    func `simplification option all cases`() {
+    func simplificationOptionAllCases() {
         let _: MVTSimplificationOption = .none
         let _: MVTSimplificationOption = .local
         let _: MVTSimplificationOption = .postgis(preserveCollapsed: true)
@@ -73,7 +73,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func `validation option all cases`() {
+    func validationOptionAllCases() {
         let _: MVTMakeValidOption = .none
         let _: MVTMakeValidOption = .default
         let _: MVTMakeValidOption = .linework
@@ -82,7 +82,7 @@ struct MVTPostgisConfigurationTests {
     }
 
     @Test
-    func `configuration closures`() {
+    func configurationClosures() {
         let clipBlock: @Sendable (Int, PostgisSource?) -> MVTClippingOption = { _, _ in .postgis }
         let simplBlock: @Sendable (Int, PostgisSource?) -> MVTSimplificationOption = { _, _ in .local }
         let validBlock: @Sendable (Int, PostgisSource?) -> MVTMakeValidOption = { _, _ in .linework }
@@ -99,18 +99,18 @@ struct MVTPostgisConfigurationTests {
 struct TileOutputFormatTests {
 
     @Test
-    func `all cases`() {
+    func allCases() {
         #expect(TileOutputFormat.allCases == [.mvt, .mlt])
     }
 
     @Test
-    func `raw values`() {
+    func rawValues() {
         #expect(TileOutputFormat.mvt.rawValue == "mvt")
         #expect(TileOutputFormat.mlt.rawValue == "mlt")
     }
 
     @Test
-    func `configuration closures are invoked`() {
+    func configurationClosuresAreInvoked() {
         let source = PostgisSource(name: "Closures", layers: [])
         let config = MVTPostgisConfiguration(
             clipping: { zoom, _ in zoom > 10 ? .local : .postgis },

@@ -13,7 +13,7 @@ import Darwin
 struct PoolDistributorTests {
 
     @Test
-    func `pool distributor shutdown clears pools`() async {
+    func poolDistributorShutdownClearsPools() async {
         let config = MVTPostgisConfiguration()
         let logger = Logger(label: "test")
         let distributor = PoolDistributor(configuration: config, logger: logger)
@@ -24,7 +24,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `pool infos before any connection is empty`() async {
+    func poolInfosBeforeAnyConnectionIsEmpty() async {
         let config = MVTPostgisConfiguration()
         let logger = Logger(label: "test")
         let distributor = PoolDistributor(configuration: config, logger: logger)
@@ -34,7 +34,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `close idle connections on empty distributor`() async {
+    func closeIdleConnectionsOnEmptyDistributor() async {
         let config = MVTPostgisConfiguration()
         let logger = Logger(label: "test")
         let distributor = PoolDistributor(configuration: config, logger: logger)
@@ -43,7 +43,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `abort batch on empty distributor`() async {
+    func abortBatchOnEmptyDistributor() async {
         let config = MVTPostgisConfiguration()
         let logger = Logger(label: "test")
         let distributor = PoolDistributor(configuration: config, logger: logger)
@@ -85,7 +85,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `shut down pool is recreated once database is reachable`() async throws {
+    func shutDownPoolIsRecreatedOnceDatabaseIsReachable() async throws {
         let config = MVTPostgisConfiguration()
         var logger = Logger(label: "test")
         logger.logLevel = .critical
@@ -117,7 +117,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `shut down pool is kept while database is unreachable`() async {
+    func shutDownPoolIsKeptWhileDatabaseIsUnreachable() async {
         let config = MVTPostgisConfiguration()
         var logger = Logger(label: "test")
         logger.logLevel = .critical
@@ -138,7 +138,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `request storm during outage never recreates`() async {
+    func requestStormDuringOutageNeverRecreates() async {
         // Regression test for a production crash where blind recreations
         // created too many pools/connections. With the probe gate, a storm
         // of concurrent requests against an unreachable database must
@@ -173,7 +173,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `healthy pool is reused`() async {
+    func healthyPoolIsReused() async {
         let config = MVTPostgisConfiguration()
         var logger = Logger(label: "test")
         logger.logLevel = .critical
@@ -192,7 +192,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `connection against unreachable host throws but pool recovers`() async throws {
+    func connectionAgainstUnreachableHostThrowsButPoolRecovers() async throws {
         var logger = Logger(label: "test")
         logger.logLevel = .critical
 
@@ -223,7 +223,7 @@ struct PoolDistributorTests {
     }
 
     @Test
-    func `reachability probe detects open and closed ports`() async throws {
+    func reachabilityProbeDetectsOpenAndClosedPorts() async throws {
         let listener = try LocalListener()
         defer { listener.close() }
 

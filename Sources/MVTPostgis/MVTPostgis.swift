@@ -29,7 +29,7 @@ public final class MVTPostgis: Sendable {
     /// Used when no explicit ``configuration`` is passed to the initializer.
     /// Changes after the first instance is created have no effect on existing instances.
     /// See ``MVTPostgisConfiguration``.
-    public nonisolated(unsafe) static var configuration: MVTPostgisConfiguration = .init()
+    nonisolated(unsafe) public static var configuration: MVTPostgisConfiguration = .init()
 
     private static let postgisDatasourceTypeCode = "postgis"
     private static let batchId: ManagedAtomic<Int> = .init(0)

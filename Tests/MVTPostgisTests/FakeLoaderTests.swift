@@ -52,7 +52,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `fake loader drives multiple layers and runtime tracking`() async throws {
+    func fakeLoaderDrivesMultipleLayersAndRuntimeTracking() async throws {
         let source = source(layers: [layer(id: "first"), layer(id: "second")])
         let postgis = try MVTPostgis(
             source: source,
@@ -72,7 +72,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `fake loader receives feature mapping`() async throws {
+    func fakeLoaderReceivesFeatureMapping() async throws {
         let source = source(layers: [layer(id: "layer")])
         let postgis = try MVTPostgis(
             source: source,
@@ -95,7 +95,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `fake loader receives each layer projection`() async throws {
+    func fakeLoaderReceivesEachLayerProjection() async throws {
         let source = source(layers: [
             layer(id: "geographic", srid: .epsg4326),
             layer(id: "mercator", srid: .epsg3857),
@@ -113,7 +113,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `fake loader data produces MVT and MLT`() async throws {
+    func fakeLoaderDataProducesMvtAndMlt() async throws {
         let source = source(layers: [layer(id: "layer")])
         let postgis = try MVTPostgis(
             source: source,
@@ -135,7 +135,7 @@ struct FakeLoaderTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `tile timeout is reported`() async throws {
+    func tileTimeoutIsReported() async throws {
         let source = source(layers: [layer(id: "slow")])
         let postgis = try MVTPostgis(
             source: source,
@@ -158,7 +158,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `loader error is propagated`() async throws {
+    func loaderErrorIsPropagated() async throws {
         struct LoaderError: Equatable, Error {
 
             let message: String
@@ -182,7 +182,7 @@ struct FakeLoaderTests {
     }
 
     @Test
-    func `cancelled task throws cancelled before loading`() async throws {
+    func cancelledTaskThrowsCancelledBeforeLoading() async throws {
         let source = source(layers: [layer(id: "layer")])
         let postgis = try MVTPostgis(
             source: source,

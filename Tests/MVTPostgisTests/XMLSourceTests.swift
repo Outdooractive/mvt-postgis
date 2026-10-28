@@ -46,7 +46,7 @@ struct XMLSourceTests {
     """
 
     @Test
-    func `XML source`() throws {
+    func xmlSource() throws {
         let data = try #require(XMLSourceTests.xmlSource.data(using: .utf8))
         let source = try PostgisSource.load(from: data, layerAllowlist: nil)
 

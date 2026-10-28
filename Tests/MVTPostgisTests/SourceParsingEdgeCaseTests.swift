@@ -8,7 +8,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - JSON edge cases
 
     @Test
-    func `json without optional fields`() throws {
+    func jsonWithoutOptionalFields() throws {
         let json = """
         {
           "name": "Minimal",
@@ -42,7 +42,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `json with 3857 projection`() throws {
+    func jsonWith3857Projection() throws {
         let json = """
         {
           "name": "3857 Source",
@@ -73,7 +73,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `json boundin box parsing`() throws {
+    func jsonBoundingBoxParsing() throws {
         let json = """
         {
           "name": "BBox",
@@ -111,7 +111,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - YML edge cases
 
     @Test
-    func `yml with 3857 projection`() throws {
+    func ymlWith3857Projection() throws {
         let yml = """
         name: Test
         description: ""
@@ -143,7 +143,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `yml with layer allowlist`() throws {
+    func ymlWithLayerAllowlist() throws {
         let yml = """
         name: Test
         description: ""
@@ -194,7 +194,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - XML edge cases
 
     @Test
-    func `xml with extent but no bounding box`() throws {
+    func xmlWithExtentButNoBoundingBox() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -229,7 +229,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `xml with layer allowlist`() throws {
+    func xmlWithLayerAllowlist() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -277,7 +277,7 @@ struct SourceParsingEdgeCaseTests {
     // MARK: - Error handling
 
     @Test
-    func `invalid JSON throws`() throws {
+    func invalidJsonThrows() throws {
         let data = try #require("{invalid json".data(using: .utf8))
         #expect(throws: Error.self) {
             try PostgisSource.load(from: data, layerAllowlist: nil)
@@ -285,7 +285,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `xml without layer throws`() throws {
+    func xmlWithoutLayerThrows() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <!DOCTYPE Map[]>
@@ -299,7 +299,7 @@ struct SourceParsingEdgeCaseTests {
     }
 
     @Test
-    func `layer allowlist filters JSON`() throws {
+    func layerAllowlistFiltersJson() throws {
         let json = """
         {
           "name": "Multi Layer",
@@ -351,7 +351,7 @@ struct SourceParsingEdgeCaseTests {
 struct XMLSourceErrorTests {
 
     @Test
-    func `missing datasource throws`() throws {
+    func missingDatasourceThrows() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <Map srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">
@@ -370,7 +370,7 @@ struct XMLSourceErrorTests {
     }
 
     @Test
-    func `incomplete datasource throws`() throws {
+    func incompleteDatasourceThrows() throws {
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <Map srs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs">

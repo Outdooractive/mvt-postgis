@@ -42,7 +42,7 @@ struct YMLSourceTests {
     """
 
     @Test
-    func `YML source`() throws {
+    func ymlSource() throws {
         let data = try #require(YMLSourceTests.ymlSource.data(using: .utf8))
         let source = try PostgisSource.load(from: data, layerAllowlist: nil)
 
