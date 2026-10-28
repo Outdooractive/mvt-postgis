@@ -34,6 +34,9 @@ The following PostgreSQL property types are decoded:
 - `xml` (text)
 - `bytea` (base64)
 - `money` (decimal string)
+- `hstore` (dictionary; `NULL` values are omitted)
+- `interval` (readable string)
+- temporal ranges `tsrange`, `tstzrange`, `daterange` (range string)
 - one-dimensional arrays of the above; `NULL` elements are dropped and empty
   arrays are preserved. `oid[]` is not supported because PostgresNIO currently
   reports it in text format.
@@ -42,11 +45,11 @@ The following PostgreSQL property types are decoded:
 
 Not yet supported; the property is omitted and a debug message is logged:
 
-- `time`, `timetz`, `interval`
+- `time`, `timetz`
 - `inet`, `cidr`, `macaddr`, `macaddr8`
 - `bit`, `varbit`
-- range and multirange types
-- composite types, `hstore`
+- numeric and integer ranges, and multiranges
+- composite types
 - multidimensional arrays
 
 `numeric` values are converted to `Double`, so very high-precision values can

@@ -9,10 +9,12 @@ and this project adheres to semantic versioning.
 
 ### Added
 
-- Decoding for JSON/JSONB, XML, bytea (base64), money, OID/reg* types and
+- Decoding for JSON/JSONB, XML, bytea (base64), money, hstore, interval,
+  temporal ranges (`tsrange`, `tstzrange`, `daterange`), OID/reg* types and
   additional array types (JSON, bytea, XML, money, numeric, bpchar, name,
-  UUID, date, timestamp, timestamptz). Enums and text-like user-defined types
-  are preserved as text; domains over supported scalars use the base type.
+  UUID, date, timestamp, timestamptz, interval). Enums and text-like
+  user-defined types are preserved as text; domains over supported scalars use
+  the base type.
 - Safe handling of empty, NULL-containing and multidimensional arrays.
 - A deterministic PostGIS integration suite with checked-in SQL fixtures,
   Docker/CI database setup, fake-loader pipeline tests, and a 90% coverage gate.

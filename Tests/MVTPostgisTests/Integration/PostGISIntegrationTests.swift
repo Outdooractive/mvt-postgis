@@ -2,6 +2,7 @@ import Foundation
 import GISTools
 @testable import MVTPostgis
 import MVTTools
+import PostgresConnectionPool
 import Testing
 
 @Suite(.serialized, .enabled(if: IntegrationEnvironment.isAvailable))
@@ -66,13 +67,20 @@ struct PostGISIntegrationTests {
         "timestamp_array": "",
         "timestamptz_array": "",
         "enum_value": "",
+        "hstore_value": "",
         "unsupported_time": "",
-        "unsupported_interval": "",
+        "interval_value": "",
+        "interval_array": "",
         "unsupported_inet": "",
         "unsupported_cidr": "",
         "unsupported_macaddr": "",
         "unsupported_bit": "",
-        "unsupported_range": "",
+        "unsupported_int4range": "",
+        "tsrange_value": "",
+        "tstzrange_value": "",
+        "daterange_value": "",
+        "empty_range": "",
+        "unbounded_range": "",
         "domain_value": "",
         "unsupported_composite": "",
         "geom": "",
@@ -276,14 +284,25 @@ struct PostGISIntegrationTests {
                 #expect((properties["timestamp_array"] as? [String])?.first?.hasPrefix("2024-01-02T03:04:05") == true)
                 #expect((properties["timestamptz_array"] as? [String])?.first?.hasPrefix("2024-01-02T03:04:05") == true)
                 #expect(properties["enum_value"] as? String == "happy")
+                #expect(properties["hstore_value"] as? [String: String] == [
+                    "name": "München",
+                    "population": "1500000",
+                ])
+
+                #expect(properties["interval_value"] as? String == "1 day 02:03:04")
+                #expect(properties["interval_array"] as? [String] == ["1 day", "02:00:00"])
+                #expect(properties["tsrange_value"] as? String == "[2024-01-02T03:04:05Z,2024-01-03T04:05:06Z)")
+                #expect(properties["tstzrange_value"] as? String == "[2024-01-02T03:04:05Z,2024-01-03T04:05:06Z)")
+                #expect(properties["daterange_value"] as? String == "[2024-01-02T00:00:00Z,2024-01-05T00:00:00Z)")
+                #expect(properties["empty_range"] as? String == "empty")
+                #expect(properties["unbounded_range"] as? String == "(,2024-01-05T00:00:00Z)")
 
                 #expect(properties["unsupported_time"] == nil)
-                #expect(properties["unsupported_interval"] == nil)
                 #expect(properties["unsupported_inet"] == nil)
                 #expect(properties["unsupported_cidr"] == nil)
                 #expect(properties["unsupported_macaddr"] == nil)
                 #expect(properties["unsupported_bit"] == nil)
-                #expect(properties["unsupported_range"] == nil)
+                #expect(properties["unsupported_int4range"] == nil)
                 #expect(properties["domain_value"] as? Int == 42)
                 #expect(properties["unsupported_composite"] == nil)
 
@@ -657,6 +676,14 @@ struct PostGISIntegrationTests {
                 }
                 catch is CancellationError {
                     // Cancellation may surface directly while the query is in flight.
+                }
+                catch let error as PoolError {
+                    switch error {
+                    case .cancelled, .connectionFailed, .queryCancelled:
+                        break
+                    default:
+                        Issue.record("Unexpected pool error during cancellation: \(error)")
+                    }
                 }
             }
         }

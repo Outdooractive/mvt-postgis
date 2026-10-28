@@ -153,6 +153,8 @@ CREATE TABLE "{{schema}}".missing_geometry (
 INSERT INTO "{{schema}}".missing_geometry (id, name) VALUES
     (1, 'no-geometry');
 
+CREATE EXTENSION IF NOT EXISTS hstore;
+
 CREATE TYPE "{{schema}}".mood AS ENUM ('sad', 'ok', 'happy');
 CREATE DOMAIN "{{schema}}".positive_int AS int4 CHECK (VALUE > 0);
 CREATE TYPE "{{schema}}".pair AS (x int4, y int4);
@@ -185,13 +187,20 @@ CREATE TABLE "{{schema}}".extended_types (
     timestamp_array timestamp[],
     timestamptz_array timestamptz[],
     enum_value "{{schema}}".mood,
+    hstore_value hstore,
     unsupported_time time,
-    unsupported_interval interval,
+    interval_value interval,
+    interval_array interval[],
     unsupported_inet inet,
     unsupported_cidr cidr,
     unsupported_macaddr macaddr,
     unsupported_bit bit(4),
-    unsupported_range int4range,
+    unsupported_int4range int4range,
+    tsrange_value tsrange,
+    tstzrange_value tstzrange,
+    daterange_value daterange,
+    empty_range tsrange,
+    unbounded_range daterange,
     domain_value "{{schema}}".positive_int,
     unsupported_composite "{{schema}}".pair,
     geom geometry(Point, 4326)
@@ -225,13 +234,20 @@ INSERT INTO "{{schema}}".extended_types VALUES (
     ARRAY['2024-01-02 03:04:05'::timestamp, '2024-01-03 04:05:06'::timestamp],
     ARRAY['2024-01-02 03:04:05+00'::timestamptz, '2024-01-03 04:05:06+00'::timestamptz],
     'happy'::"{{schema}}".mood,
+    'name => "München", population => "1500000"'::hstore,
     '12:34:56'::time,
     '1 day 02:03:04'::interval,
+    ARRAY['1 day'::interval, '02:00:00'::interval],
     '192.0.2.1'::inet,
     '192.0.2.0/24'::cidr,
     '08:00:2b:01:02:03'::macaddr,
     B'1010'::bit(4),
     '[1,5)'::int4range,
+    '[2024-01-02 03:04:05, 2024-01-03 04:05:06)'::tsrange,
+    '[2024-01-02 03:04:05+00, 2024-01-03 04:05:06+00)'::tstzrange,
+    '[2024-01-02, 2024-01-05)'::daterange,
+    'empty'::tsrange,
+    '(,2024-01-05)'::daterange,
     42::"{{schema}}".positive_int,
     ROW(1, 2)::"{{schema}}".pair,
     ST_GeomFromText('POINT(11.5 48.1)', 4326)
