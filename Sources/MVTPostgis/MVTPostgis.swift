@@ -703,11 +703,11 @@ public final class MVTPostgis: Sendable {
 
                     wkbBytes.set(wkbBytes.item + Int64(geometryData.count))
 
-                    // MVT/MLT feature IDs are unsigned integers. Use a positive
-                    // integer `id` as the feature ID and keep every other `id`
-                    // value as a regular property.
+                    // MVT/MLT feature IDs are unsigned integers. Use a
+                    // non-negative integer `id` as the feature ID and keep every
+                    // other `id` value as a regular property.
                     var featureId: Feature.Identifier?
-                    if let id = properties["id"] as? Int, id > 0 {
+                    if let id = properties["id"] as? Int, id >= 0 {
                         featureId = .int(id)
                         properties.removeValue(forKey: "id")
                     }

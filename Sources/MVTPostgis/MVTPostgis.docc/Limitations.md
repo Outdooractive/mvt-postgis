@@ -62,7 +62,7 @@ sentinel dates rather than the strings `infinity` / `-infinity`.
 
 ## Feature IDs
 
-Only a **positive integer** property named `id` is used as the feature ID. It is
+Only a **non-negative integer** property named `id` is used as the feature ID. It is
 removed from the properties. Zero, negative, text, UUID, floating-point,
 boolean, array/JSON and oversized numeric `id` values remain regular
 properties, and the in-memory feature receives a generated string ID.

@@ -32,8 +32,8 @@ and this project adheres to semantic versioning.
 
 ### Changed
 
-- Only a positive integer `id` property is used as the feature ID. Zero,
-  negative, text, UUID, floating-point, boolean, array/JSON and oversized
+- Only a non-negative integer `id` property is used as the feature ID.
+  Negative, text, UUID, floating-point, boolean, array/JSON and oversized
   numeric IDs remain properties instead of being silently dropped or converted
   to an unsigned MVT ID.
 - CI and the local integration runner now use PostgreSQL 18 / PostGIS 3.6,

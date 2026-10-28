@@ -596,12 +596,13 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func positiveIntegerIdsBecomeFeatureIds() async throws {
+    func nonNegativeIntegerIdsBecomeFeatureIds() async throws {
         let cases: [(caseName: String, cast: String, expected: Int)] = [
             ("int2_max", "int2", 32767),
             ("int4_max", "int4", 2_147_483_647),
             ("int8_max", "int8", Int.max),
             ("int8_above_2_53", "int8", 9_007_199_254_740_993),
+            ("zero", "int8", 0),
         ]
 
         try await IntegrationFixture.withFixture { fixture in
@@ -627,6 +628,7 @@ struct PostGISIntegrationTests {
         let cases: [(caseName: String, expected: Int)] = [
             ("int8_max", Int.max),
             ("int8_above_2_53", 9_007_199_254_740_993),
+            ("zero", 0),
         ]
 
         try await IntegrationFixture.withFixture { fixture in
@@ -652,12 +654,11 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func nonPositiveAndNonIntegerIdsRemainProperties() async throws {
+    func negativeAndNonIntegerIdsRemainProperties() async throws {
         let cases: [(caseName: String, cast: String)] = [
             ("int2_min", "int2"),
             ("int4_min", "int4"),
             ("int8_min", "int8"),
-            ("zero", "int8"),
             ("text", "text"),
             ("uuid", "uuid"),
             ("float", "float8"),
@@ -687,8 +688,6 @@ struct PostGISIntegrationTests {
                         #expect(idProperty as? Int == -2_147_483_648)
                     case "int8_min":
                         #expect(idProperty as? Int == Int.min)
-                    case "zero":
-                        #expect(idProperty as? Int == 0)
                     case "text":
                         #expect(idProperty as? String == "abc")
                     case "uuid":
