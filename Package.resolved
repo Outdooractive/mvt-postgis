@@ -1,5 +1,5 @@
 {
-  "originHash" : "d322635638e74fa346a8e885e345cb0cfa8063c6032916612fc8edcff60bc25c",
+  "originHash" : "e491f59aaa5b90baed9172d36d4cbca97295686334263d28d1bfb4d28cf971b4",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Outdooractive/PostgresConnectionPool.git",
       "state" : {
-        "revision" : "8c4b9d2d962e2e5e003f178571a348adb0082586",
-        "version" : "1.1.0"
+        "revision" : "99425f31b9717dbf30e05a38342b6fe938d9850b",
+        "version" : "1.1.1"
       }
     },
     {
