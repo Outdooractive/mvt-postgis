@@ -16,6 +16,9 @@ and this project adheres to semantic versioning.
   user-defined types are preserved as text; domains over supported scalars use
   the base type.
 - Safe handling of empty, NULL-containing and multidimensional arrays.
+- Deterministic property and feature-ID edge-case fixtures covering empty,
+  long and Unicode text, control characters, integer/numeric/float extremes,
+  temporal boundaries, duplicate IDs, missing IDs and non-integer IDs.
 - A deterministic PostGIS integration suite with checked-in SQL fixtures,
   Docker/CI database setup, fake-loader pipeline tests, and a 90% coverage gate.
 - Public initializers for `PostgisSource`, `PostgisLayer`,
@@ -29,6 +32,10 @@ and this project adheres to semantic versioning.
 
 ### Changed
 
+- Only a non-negative integer `id` property is used as the feature ID.
+  Negative, text, UUID, floating-point, boolean, array/JSON and oversized
+  numeric IDs remain properties instead of being silently dropped or converted
+  to an unsigned MVT ID.
 - CI and the local integration runner now use PostgreSQL 18 / PostGIS 3.6,
   the minimum supported production version.
 - Updated to `mvt-tools` 3.0.0-beta.5, `gis-tools` 3.0.0-beta.5,
@@ -47,6 +54,10 @@ and this project adheres to semantic versioning.
 
 ### Fixed
 
+- PostgreSQL `numeric` `NaN`, `Infinity` and `-Infinity` were previously decoded
+  as `0.0`; they are now preserved.
+- Timestamps now keep microsecond precision, and `timestamptz` values are
+  rendered consistently in UTC.
 - `validate(sql:forLayer:)` now explains Mapnik-style `(SELECT ...) AS data`
   queries correctly instead of reporting a syntax error for valid SQL.
 - Integer, floating-point and boolean array properties drop `NULL` elements

@@ -29,7 +29,7 @@ The following PostgreSQL property types are decoded:
 - `int2`, `int4`, `int8`, `oid`, `regproc`, `regclass`, `regtype`
 - `float4`, `float8`, `numeric`
 - `boolean`
-- `date`, `timestamp`, `timestamptz` (ISO 8601 strings)
+- `date`, `timestamp`, `timestamptz` (ISO 8601 strings; timestamps keep microsecond precision and `timestamptz` is rendered in UTC)
 - `json`, `jsonb` (JSON text)
 - `xml` (text)
 - `bytea` (base64)
@@ -53,8 +53,22 @@ Not yet supported; the property is omitted and a debug message is logged:
 - multidimensional arrays
 
 `numeric` values are converted to `Double`, so very high-precision values can
-lose precision. Multi-dimensional arrays are rejected before decoding because
-PostgresNIO's array decoder only supports zero- and one-dimensional arrays.
+lose precision. PostgreSQL `NaN`, `Infinity` and `-Infinity` are preserved.
+Multi-dimensional arrays are rejected before decoding because PostgresNIO's
+array decoder only supports zero- and one-dimensional arrays.
+
+PostgreSQL `infinity` and `-infinity` timestamps decode to PostgresNIO's
+sentinel dates rather than the strings `infinity` / `-infinity`.
+
+## Feature IDs
+
+Only a **non-negative integer** property named `id` is used as the feature ID. It is
+removed from the properties. Zero, negative, text, UUID, floating-point,
+boolean, array/JSON and oversized numeric `id` values remain regular
+properties, and the in-memory feature receives a generated string ID.
+
+MVT and MLT feature IDs are unsigned integers. Non-numeric IDs are therefore
+not encoded as feature IDs, and duplicate numeric IDs are allowed.
 
 ## MVT and MLT are lossy
 

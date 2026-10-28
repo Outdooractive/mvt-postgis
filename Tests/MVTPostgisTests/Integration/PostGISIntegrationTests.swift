@@ -96,6 +96,49 @@ struct PostGISIntegrationTests {
         "geom": "",
     ]
 
+    private static let propertyEdgeFields: [String: String] = [
+        "case_name": "",
+        "text_empty": "",
+        "text_unicode": "",
+        "text_control": "",
+        "text_long": "",
+        "char_padded": "",
+        "na.me": "",
+        "ümlaut": "",
+        "int2_min": "",
+        "int2_max": "",
+        "int4_min": "",
+        "int4_max": "",
+        "int8_min": "",
+        "int8_max": "",
+        "int8_above_2_53": "",
+        "numeric_high": "",
+        "numeric_nan": "",
+        "numeric_infinity": "",
+        "numeric_neg_infinity": "",
+        "float4_nan": "",
+        "float4_infinity": "",
+        "float4_neg_infinity": "",
+        "float4_min_subnormal": "",
+        "float4_max": "",
+        "float8_nan": "",
+        "float8_infinity": "",
+        "float8_neg_infinity": "",
+        "float8_min_subnormal": "",
+        "float8_max": "",
+        "date_bc": "",
+        "date_after_9999": "",
+        "date_infinity": "",
+        "date_neg_infinity": "",
+        "timestamp_infinity": "",
+        "timestamp_neg_infinity": "",
+        "timestamptz_infinity": "",
+        "timestamptz_neg_infinity": "",
+        "timestamp_micros": "",
+        "timestamptz_dst": "",
+        "geom": "",
+    ]
+
     private func configuration(
         clipping: MVTClippingOption = .none,
         simplification: MVTSimplificationOption = .none,
@@ -413,6 +456,357 @@ struct PostGISIntegrationTests {
                 let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
                 let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
                 #expect(mvtTile.features(for: "geography").count == 3)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func decodesPropertyValueEdgeCases() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "property_edges",
+                table: "property_edge_cases",
+                fields: Self.propertyEdgeFields,
+                srid: .epsg4326)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = try #require(result.tile.features(for: "property_edges").first)
+                let properties = feature.properties
+
+                let unicode = "emoji 😀 combining e\u{0301} RTL \u{202E}abc\u{202C} non-BMP 𝄞"
+
+                #expect(properties["text_empty"] as? String == "")
+                #expect(properties["text_unicode"] as? String == unicode)
+                #expect(properties["text_control"] as? String == "line1\nline2\ttab")
+                #expect((properties["text_long"] as? String)?.count == 1_000_000)
+                #expect(properties["char_padded"] as? String == "AB    ")
+                #expect(properties["na.me"] as? String == "dotted")
+                #expect(properties["ümlaut"] as? String == "umlaut")
+
+                #expect(properties["int2_min"] as? Int == -32768)
+                #expect(properties["int2_max"] as? Int == 32767)
+                #expect(properties["int4_min"] as? Int == -2_147_483_648)
+                #expect(properties["int4_max"] as? Int == 2_147_483_647)
+                #expect(properties["int8_min"] as? Int == Int.min)
+                #expect(properties["int8_max"] as? Int == Int.max)
+                #expect(properties["int8_above_2_53"] as? Int == 9_007_199_254_740_993)
+
+                #expect(properties["numeric_high"] as? Double == 1.2345678901234567e19)
+                #expect((properties["numeric_nan"] as? Double)?.isNaN == true)
+                #expect(properties["numeric_infinity"] as? Double == .infinity)
+                #expect(properties["numeric_neg_infinity"] as? Double == -.infinity)
+
+                #expect((properties["float4_nan"] as? Double)?.isNaN == true)
+                #expect(properties["float4_infinity"] as? Double == .infinity)
+                #expect(properties["float4_neg_infinity"] as? Double == -.infinity)
+                #expect(properties["float4_min_subnormal"] as? Double == 1.401298464324817e-45)
+                #expect(properties["float4_max"] as? Double == 3.4028234663852886e38)
+
+                #expect((properties["float8_nan"] as? Double)?.isNaN == true)
+                #expect(properties["float8_infinity"] as? Double == .infinity)
+                #expect(properties["float8_neg_infinity"] as? Double == -.infinity)
+                #expect(properties["float8_min_subnormal"] as? Double == 5e-324)
+                #expect(properties["float8_max"] as? Double == 1.7976931348623157e308)
+
+                #expect((properties["date_bc"] as? String)?.hasPrefix("-4712") == true)
+                #expect((properties["date_after_9999"] as? String)?.hasPrefix("10000") == true)
+                #expect(properties["date_infinity"] as? String != nil)
+                #expect(properties["date_neg_infinity"] as? String != nil)
+                #expect(properties["timestamp_infinity"] as? String != nil)
+                #expect(properties["timestamp_neg_infinity"] as? String != nil)
+                #expect(properties["timestamptz_infinity"] as? String != nil)
+                #expect(properties["timestamptz_neg_infinity"] as? String != nil)
+                #expect(properties["timestamp_micros"] as? String == "2024-01-02T03:04:05.123456Z")
+                #expect(properties["timestamptz_dst"] as? String == "2024-03-31T01:30:00.000000Z")
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func propertyEdgeValuesRoundTrip() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let fields = [
+                "text_unicode": "",
+                "int8_max": "",
+                "int8_above_2_53": "",
+                "numeric_high": "",
+                "timestamp_micros": "",
+                "float8_nan": "",
+                "char_padded": "",
+                "geom": "",
+            ]
+            let layer = fixture.layer(
+                id: "roundtrip",
+                table: "property_edge_cases",
+                fields: fields,
+                srid: .epsg4326,
+                sql: """
+                (SELECT text_unicode, int8_max, int8_above_2_53, numeric_high,
+                        timestamp_micros, float8_nan, char_padded, geom
+                 FROM "\(fixture.schema)".property_edge_cases
+                 WHERE case_name = 'all' AND geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mlt = try await postgis.data(forTile: Self.tile, format: .mlt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
+
+                for tile in [mvtTile, mltTile] {
+                    let feature = try #require(tile.features(for: "roundtrip").first)
+                    let properties = feature.properties
+                    let unicode = "emoji 😀 combining e\u{0301} RTL \u{202E}abc\u{202C} non-BMP 𝄞"
+
+                    #expect(properties["text_unicode"] as? String == unicode)
+                    #expect(Self.integer(properties["int8_max"]) == Int.max)
+                    #expect(Self.integer(properties["int8_above_2_53"]) == 9_007_199_254_740_993)
+                    #expect(properties["numeric_high"] as? Double == 1.2345678901234567e19)
+                    #expect(properties["timestamp_micros"] as? String == "2024-01-02T03:04:05.123456Z")
+                    #expect((properties["float8_nan"] as? Double)?.isNaN == true)
+                    #expect(properties["char_padded"] as? String == "AB    ")
+                }
+            }
+        }
+    }
+
+    private func idLayer(
+        fixture: IntegrationFixture,
+        caseName: String,
+        cast: String,
+    ) -> PostgisLayer {
+        let idExpression = cast == "text" ? "id_text" : "id_text::\(cast)"
+        return fixture.layer(
+            id: "ids",
+            table: "id_edge_cases",
+            fields: ["id": "", "label": "", "geom": ""],
+            srid: .epsg4326,
+            sql: """
+            (SELECT \(idExpression) AS id, label, geom
+             FROM "\(fixture.schema)".id_edge_cases
+             WHERE case_name = '\(caseName)' AND geom && !bbox!) AS data
+            """)
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func nonNegativeIntegerIdsBecomeFeatureIds() async throws {
+        let cases: [(caseName: String, cast: String, expected: Int)] = [
+            ("int2_max", "int2", 32767),
+            ("int4_max", "int4", 2_147_483_647),
+            ("int8_max", "int8", Int.max),
+            ("int8_above_2_53", "int8", 9_007_199_254_740_993),
+            ("zero", "int8", 0),
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            for item in cases {
+                let layer = idLayer(fixture: fixture, caseName: item.caseName, cast: item.cast)
+
+                try await withPostgis(
+                    fixture.source(layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    let result = try await postgis.vectorTile(forTile: Self.tile)
+                    let feature = try #require(result.tile.features(for: "ids").first)
+
+                    #expect(feature.id == .int(item.expected))
+                    #expect(feature.properties["id"] == nil)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func largeIntegerIdsRoundTrip() async throws {
+        let cases: [(caseName: String, expected: Int)] = [
+            ("int8_max", Int.max),
+            ("int8_above_2_53", 9_007_199_254_740_993),
+            ("zero", 0),
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            for item in cases {
+                let layer = idLayer(fixture: fixture, caseName: item.caseName, cast: "int8")
+
+                try await withPostgis(
+                    fixture.source(layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                    let mlt = try await postgis.data(forTile: Self.tile, format: .mlt, options: VectorTile.ExportOptions())
+                    let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                    let mltTile = try VectorTile(mltData: #require(mlt.data), tile: Self.tile)
+
+                    for tile in [mvtTile, mltTile] {
+                        let feature = try #require(tile.features(for: "ids").first)
+                        #expect(feature.id?.uint64Value == UInt64(item.expected))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func negativeAndNonIntegerIdsRemainProperties() async throws {
+        let cases: [(caseName: String, cast: String)] = [
+            ("int2_min", "int2"),
+            ("int4_min", "int4"),
+            ("int8_min", "int8"),
+            ("text", "text"),
+            ("uuid", "uuid"),
+            ("float", "float8"),
+            ("bool", "boolean"),
+            ("array", "int4[]"),
+            ("json", "jsonb"),
+            ("numeric", "numeric"),
+            ("oversized", "text"),
+        ]
+
+        try await IntegrationFixture.withFixture { fixture in
+            for item in cases {
+                let layer = idLayer(fixture: fixture, caseName: item.caseName, cast: item.cast)
+
+                try await withPostgis(
+                    fixture.source(layers: [layer]),
+                    configuration: configuration())
+                { postgis in
+                    let result = try await postgis.vectorTile(forTile: Self.tile)
+                    let feature = try #require(result.tile.features(for: "ids").first)
+                    let idProperty = feature.properties["id"]
+
+                    switch item.caseName {
+                    case "int2_min":
+                        #expect(idProperty as? Int == -32768)
+                    case "int4_min":
+                        #expect(idProperty as? Int == -2_147_483_648)
+                    case "int8_min":
+                        #expect(idProperty as? Int == Int.min)
+                    case "text":
+                        #expect(idProperty as? String == "abc")
+                    case "uuid":
+                        #expect(idProperty as? String == "00000000-0000-0000-0000-000000000042")
+                    case "float":
+                        #expect(idProperty as? Double == 1.5)
+                    case "bool":
+                        #expect(idProperty as? Bool == true)
+                    case "array":
+                        #expect(idProperty as? [Int] == [1, 2])
+                    case "json":
+                        #expect(Self.jsonObject(idProperty)?["a"] as? Int == 1)
+                    case "numeric":
+                        #expect(idProperty as? Double == 1.2345678901234567e19)
+                    case "oversized":
+                        #expect(idProperty as? String == "9223372036854775808")
+                    default:
+                        Issue.record("Unexpected ID case \(item.caseName)")
+                    }
+
+                    // Only positive integer IDs are used as feature IDs. The
+                    // remaining values keep a generated in-memory string ID.
+                    #expect(feature.id?.int64Value == nil)
+                }
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func duplicateIdsArePreserved() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "duplicates",
+                table: "id_edge_cases",
+                fields: ["id": "", "label": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT id_text::int8 AS id, label, geom
+                 FROM "\(fixture.schema)".id_edge_cases
+                 WHERE case_name IN ('dup1', 'dup2') AND geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let features = result.tile.features(for: "duplicates")
+
+                #expect(features.count == 2)
+                #expect(features.allSatisfy { $0.id == .int(1) })
+                #expect(Set(features.compactMap { $0.properties["label"] as? String }) == ["dup1", "dup2"])
+
+                let mvt = try await postgis.data(forTile: Self.tile, format: .mvt, options: VectorTile.ExportOptions())
+                let mvtTile = try VectorTile(mvtData: #require(mvt.data), tile: Self.tile)
+                #expect(mvtTile.features(for: "duplicates").count == 2)
+                #expect(mvtTile.features(for: "duplicates").allSatisfy { $0.id?.uint64Value == 1 })
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func missingIdIsAbsent() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let layer = fixture.layer(
+                id: "missing_id",
+                table: "id_edge_cases",
+                fields: ["label": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT label, geom FROM "\(fixture.schema)".id_edge_cases
+                 WHERE case_name = 'text' AND geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [layer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let feature = try #require(result.tile.features(for: "missing_id").first)
+
+                #expect(feature.properties["id"] == nil)
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(2)))
+    func nullAndAbsentPropertiesAreBothAbsent() async throws {
+        try await IntegrationFixture.withFixture { fixture in
+            let nullLayer = fixture.layer(
+                id: "null_prop",
+                table: "property_edge_cases",
+                fields: ["null_prop": "", "case_name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT NULL::text AS null_prop, case_name, geom
+                 FROM "\(fixture.schema)".property_edge_cases
+                 WHERE case_name = 'all' AND geom && !bbox!) AS data
+                """)
+            let absentLayer = fixture.layer(
+                id: "absent_prop",
+                table: "property_edge_cases",
+                fields: ["case_name": "", "geom": ""],
+                srid: .epsg4326,
+                sql: """
+                (SELECT case_name, geom FROM "\(fixture.schema)".property_edge_cases
+                 WHERE case_name = 'all' AND geom && !bbox!) AS data
+                """)
+
+            try await withPostgis(
+                fixture.source(layers: [nullLayer, absentLayer]),
+                configuration: configuration())
+            { postgis in
+                let result = try await postgis.vectorTile(forTile: Self.tile)
+                let nullFeature = try #require(result.tile.features(for: "null_prop").first)
+                let absentFeature = try #require(result.tile.features(for: "absent_prop").first)
+
+                #expect(nullFeature.properties["null_prop"] == nil)
+                #expect(absentFeature.properties["null_prop"] == nil)
             }
         }
     }
@@ -773,6 +1167,19 @@ struct PostGISIntegrationTests {
         else { return nil }
 
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    private static func integer(_ value: Sendable?) -> Int? {
+        if let int = value as? Int {
+            return int
+        }
+        if let int64 = value as? Int64 {
+            return Int(exactly: int64)
+        }
+        if let uint64 = value as? UInt64 {
+            return Int(exactly: uint64)
+        }
+        return nil
     }
 
 }

@@ -628,12 +628,20 @@ public final class MVTPostgis: Sendable {
                                 properties[field.columnName] = array.compactMap(Self.oidInt(from:))
                             }
 
-                        case .float4, .float8, .numeric:
+                        case .float4, .float8:
                             properties[field.columnName] = data.double
 
-                        case .float4Array, .float8Array, .numericArray:
+                        case .numeric:
+                            properties[field.columnName] = Self.numericDouble(from: data)
+
+                        case .float4Array, .float8Array:
                             if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap(\.double)
+                            }
+
+                        case .numericArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap(Self.numericDouble(from:))
                             }
 
                         case .bool:
@@ -644,12 +652,24 @@ public final class MVTPostgis: Sendable {
                                 properties[field.columnName] = array.compactMap(\.bool)
                             }
 
-                        case .date, .timestamp, .timestamptz:
+                        case .date:
                             properties[field.columnName] = data.date?.ISO8601Format()
 
-                        case .dateArray, .timestampArray, .timestamptzArray:
+                        case .timestamp, .timestamptz:
+                            if let date = data.date {
+                                properties[field.columnName] = Self.timestampString(from: date)
+                            }
+
+                        case .dateArray:
                             if let array = Self.oneDimensionalArray(from: data) {
                                 properties[field.columnName] = array.compactMap({ $0.date?.ISO8601Format() })
+                            }
+
+                        case .timestampArray, .timestamptzArray:
+                            if let array = Self.oneDimensionalArray(from: data) {
+                                properties[field.columnName] = array.compactMap { data in
+                                    data.date.map(Self.timestampString(from:))
+                                }
                             }
 
                         case .interval:
@@ -683,10 +703,13 @@ public final class MVTPostgis: Sendable {
 
                     wkbBytes.set(wkbBytes.item + Int64(geometryData.count))
 
-                    // The vector tile spec only allows Int ids
+                    // MVT/MLT feature IDs are unsigned integers. Use a
+                    // non-negative integer `id` as the feature ID and keep every
+                    // other `id` value as a regular property.
                     var featureId: Feature.Identifier?
-                    if properties["id"] is Int {
-                        featureId = .init(value: properties.removeValue(forKey: "id"))
+                    if let id = properties["id"] as? Int, id >= 0 {
+                        featureId = .int(id)
+                        properties.removeValue(forKey: "id")
                     }
 
                     let feature = Feature(
@@ -756,6 +779,52 @@ public final class MVTPostgis: Sendable {
         else { return nil }
 
         return data.array
+    }
+
+    nonisolated(unsafe) private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return formatter
+    }()
+
+    private static let timestampFormatterLock = NSLock()
+
+    /// Formats a timestamp with microsecond precision in UTC.
+    private static func timestampString(from date: Date) -> String {
+        timestampFormatterLock.lock()
+        let base = timestampFormatter.string(from: date)
+        timestampFormatterLock.unlock()
+
+        let interval = date.timeIntervalSince1970
+        let fraction = interval - floor(interval)
+        let microseconds = min(Int((fraction * 1_000_000).rounded()), 999_999)
+
+        return base + String(format: ".%06dZ", microseconds)
+    }
+
+    /// Decodes numeric values, preserving PostgreSQL NaN and Infinity.
+    private static func numericDouble(from data: PostgresData) -> Double? {
+        guard var buffer = data.value,
+              buffer.readableBytes >= 6
+        else { return data.double }
+
+        // numeric binary header: ndigits, weight, sign, dscale
+        _ = buffer.readInteger(as: Int16.self)
+        _ = buffer.readInteger(as: Int16.self)
+        guard let sign = buffer.readInteger(as: Int16.self) else { return data.double }
+
+        switch UInt16(bitPattern: sign) {
+        case 0xC000:
+            return .nan
+        case 0xD000:
+            return .infinity
+        case 0xF000:
+            return -.infinity
+        default:
+            return data.double
+        }
     }
 
     /// Looks up and caches the OIDs of the `hstore` type in a database.
