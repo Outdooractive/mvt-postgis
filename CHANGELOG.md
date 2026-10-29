@@ -77,8 +77,6 @@ and this project adheres to semantic versioning.
   skipped and counted in `invalidFeatures` instead of being decoded in the
   wrong coordinate system. The query builder selects `ST_SRID(...)` for this
   check.
-- Added `MVTPostgisError.missingGeometryColumn(layer:column:)` for result sets
-  without the configured geometry column.
 - Datasource SQL may end with a trailing semicolon; the query builder trims it
   before wrapping the statement.
 - Added direct `swift-log` and `swift-atomics` dependencies and removed the

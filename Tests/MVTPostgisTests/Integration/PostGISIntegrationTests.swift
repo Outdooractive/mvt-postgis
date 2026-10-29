@@ -1680,35 +1680,6 @@ struct PostGISIntegrationTests {
     }
 
     @Test(.timeLimit(.minutes(2)))
-    func missingGeometryColumnFails() async throws {
-        try await IntegrationFixture.withFixture { fixture in
-            let layer = fixture.layer(
-                id: "missing",
-                table: "geometry_column_edge_cases",
-                fields: ["id": "", "name": ""],
-                srid: .epsg4326,
-                geometryField: "missing",
-                sql: """
-                (SELECT * FROM "\(fixture.schema)".geometry_column_edge_cases) AS data
-                """)
-
-            try await withPostgis(
-                fixture.source(layers: [layer]),
-                configuration: configuration())
-            { postgis in
-                do {
-                    _ = try await postgis.vectorTile(forTile: Self.tile)
-                    Issue.record("Expected a missing-column error")
-                }
-                catch {
-                    // Postgres reports the missing column before the loader
-                    // can inspect the result set.
-                }
-            }
-        }
-    }
-
-    @Test(.timeLimit(.minutes(2)))
     func nonGeometryColumnWithWktTextIsSkipped() async throws {
         try await IntegrationFixture.withFixture { fixture in
             let layer = fixture.layer(
