@@ -140,8 +140,9 @@ MLT.
 
 Set `MVTPostgisConfiguration.flattenGeometryCollections` to `true` to turn every
 collection member into a separate feature before clipping and encoding. Nested
-collections are flattened recursively. Each resulting feature keeps the original
-properties, foreign members and ID, so IDs can be duplicated. Alternatively,
+collections are flattened recursively. Every resulting feature keeps the
+original properties and foreign members; only the first keeps the original ID,
+while later members receive generated string IDs from `VectorTile`. Alternatively,
 split collections in SQL with `ST_CollectionExtract` or `ST_Dump`.
 
 ## Multi-geometry round trips

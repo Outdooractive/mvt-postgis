@@ -784,22 +784,30 @@ public final class MVTPostgis: Sendable {
     }
 
     /// Expands a GeometryCollection into one feature per member, recursively.
-    /// Every flattened feature keeps the original ID, properties and foreign
-    /// members, so duplicates are possible when IDs are present.
+    /// The first flattened feature keeps the original ID; later members get no
+    /// ID so a collection cannot introduce duplicate feature IDs. Properties
+    /// and foreign members are copied to every member.
     private static func flattenedFeatures(from feature: Feature) -> [Feature] {
         guard let collection = feature.geometry as? GeometryCollection else {
             return [feature]
         }
 
-        return collection.geometries.flatMap { geometry in
+        return geometryMembers(of: collection).enumerated().map { index, geometry in
             var child = Feature(
                 geometry,
-                id: feature.id,
+                id: index == 0 ? feature.id : nil,
                 properties: feature.properties)
             child.foreignMembers = feature.foreignMembers
-
-            return flattenedFeatures(from: child)
+            return child
         }
+    }
+
+    private static func geometryMembers(of geometry: GeoJsonGeometry) -> [GeoJsonGeometry] {
+        guard let collection = geometry as? GeometryCollection else {
+            return [geometry]
+        }
+
+        return collection.geometries.flatMap(geometryMembers(of:))
     }
 
     // MARK: - Property decoding
