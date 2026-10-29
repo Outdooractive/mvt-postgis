@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/Outdooractive/mvt-tools", exact: "3.0.0-beta.6", traits: ["EnableMLT"]),
         .package(url: "https://github.com/Outdooractive/gis-tools", exact: "3.0.0-beta.6"),
-        .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "1.1.1"),
+        .package(url: "https://github.com/Outdooractive/PostgresConnectionPool.git", from: "1.1.2"),
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.2"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.104.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.16.2"),

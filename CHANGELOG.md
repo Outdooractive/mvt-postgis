@@ -73,9 +73,10 @@ and this project adheres to semantic versioning.
   the minimum supported production version.
 - Documented the PostgreSQL 18 / PostGIS 3.6 support matrix and added a
   workflow-dispatch image override plus a weekly integration schedule.
-- Updated `PostgresConnectionPool` to 1.1.1. A connection that finishes
-  opening while a pool is shutting down is now closed and discarded instead of
-  leaking and trapping in PostgresNIO on release.
+- Updated `PostgresConnectionPool` to 1.1.2. A connection that finishes
+  opening while a pool is shutting down is closed and discarded, and idle
+  connections whose backend was terminated are replaced instead of hanging the
+  next request.
 - Updated to `mvt-tools` 3.0.0-beta.6, `gis-tools` 3.0.0-beta.6,
   `gis-tools-csv` 3.0.0-beta.7 and `postgres-nio` 1.33.2.
 - Rows whose geometry SRID differs from the datasource-declared SRID are

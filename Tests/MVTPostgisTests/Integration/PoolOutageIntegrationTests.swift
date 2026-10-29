@@ -67,7 +67,6 @@ struct PoolOutageIntegrationTests {
                     #expect((terminated ?? 0) >= 1, "cycle \(cycle)")
 
                     try await Task.sleep(for: .milliseconds(300))
-                    await postgis.shutdown()
 
                     let recovered = try await withBoundedResult {
                         try await postgis.vectorTile(forTile: Self.tile)
