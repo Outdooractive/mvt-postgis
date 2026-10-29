@@ -58,6 +58,8 @@ and this project adheres to semantic versioning.
   `shutdown()` and pool recreation.
 - Differential feature-content test against PostGIS `ST_AsMVT` for a
   representative tile.
+- Differential geometry assertions for the `ST_AsMVT` oracle: decoded type,
+  coordinate count, polygon ring count and bounding boxes.
 
 ### Changed
 

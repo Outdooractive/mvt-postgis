@@ -73,6 +73,39 @@ struct DifferentialIntegrationTests {
                 })
                 #expect(generatedNames == referenceNames)
 
+                let referenceByName = Dictionary(uniqueKeysWithValues: referenceFeatures.compactMap { feature in
+                    (feature.properties["name"] as? String).map { ($0, feature) }
+                })
+
+                for generated in generatedFeatures {
+                    let name = try #require(generated.properties["name"] as? String)
+                    let reference = try #require(referenceByName[name])
+
+                    #expect(generated.geometry?.type == reference.geometry?.type)
+                    #expect(generated.geometry?.allCoordinates.count == reference.geometry?.allCoordinates.count)
+
+                    if let generatedBox = generated.geometry?.boundingBox,
+                       let referenceBox = reference.geometry?.boundingBox
+                    {
+                        #expect(abs(generatedBox.southWest.longitude - referenceBox.southWest.longitude) < 0.0001)
+                        #expect(abs(generatedBox.southWest.latitude - referenceBox.southWest.latitude) < 0.0001)
+                        #expect(abs(generatedBox.northEast.longitude - referenceBox.northEast.longitude) < 0.0001)
+                        #expect(abs(generatedBox.northEast.latitude - referenceBox.northEast.latitude) < 0.0001)
+                    }
+
+                    if let generatedPolygon = generated.geometry as? Polygon,
+                       let referencePolygon = reference.geometry as? Polygon
+                    {
+                        #expect(generatedPolygon.coordinates.count == referencePolygon.coordinates.count)
+                    }
+
+                    if let generatedMultiPolygon = generated.geometry as? MultiPolygon,
+                       let referenceMultiPolygon = reference.geometry as? MultiPolygon
+                    {
+                        #expect(generatedMultiPolygon.polygons.count == referenceMultiPolygon.polygons.count)
+                    }
+                }
+
                 await postgis.shutdown()
             }
             catch {
