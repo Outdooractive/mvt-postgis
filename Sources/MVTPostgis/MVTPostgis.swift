@@ -529,11 +529,6 @@ public final class MVTPostgis: Sendable {
                 for try await serialRow in rowSequence {
                     let row = serialRow.makeRandomAccess()
 
-                    guard row.contains(geometryColumn), row.contains(sridColumn) else {
-                        throw MVTPostgisError.missingGeometryColumn(
-                            layer: layer.id,
-                            column: geometryColumn)
-                    }
                     guard let geometryBytes = row[data: geometryColumn].value else { continue }
 
                     // A row whose SRID differs from the datasource SRID cannot
