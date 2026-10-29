@@ -74,3 +74,7 @@ UUID, date and array values are fixed.
 
 CI runs the integration tests through a `postgis/postgis:18-3.6` service in the
 Linux coverage job.
+
+CI caches SwiftPM checkouts and artifacts under `.build/checkouts` and
+`.build/artifacts`, keyed by `Package.resolved`. The fast unit jobs and the
+PostGIS coverage job share the same cache layout.
