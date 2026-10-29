@@ -1,0 +1,60 @@
+name: Mutation testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: mutation (Linux, PostGIS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: swift:6.3.3
+    services:
+      postgis:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mvt_test
+          TZ: UTC
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mvt_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MVT_POSTGIS_TEST_HOST: postgis
+      MVT_POSTGIS_TEST_PORT: 5432
+      MVT_POSTGIS_TEST_USER: postgres
+      MVT_POSTGIS_TEST_PASSWORD: postgres
+      MVT_POSTGIS_TEST_DATABASE: mvt_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install OpenSSL development files
+        run: apt-get update && apt-get install -y libssl-dev
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build/checkouts
+            .build/artifacts
+          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
+      - name: Ensure Python
+        run: command -v python3 >/dev/null || (apt-get update && apt-get install -y python3)
+      - name: Run mutation campaign
+        run: python3 scripts/mutation_test.py

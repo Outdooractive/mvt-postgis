@@ -78,3 +78,15 @@ Linux coverage job.
 CI caches SwiftPM checkouts and artifacts under `.build/checkouts` and
 `.build/artifacts`, keyed by `Package.resolved`. The fast unit jobs and the
 PostGIS coverage job share the same cache layout.
+
+## Mutation testing
+
+A small curated mutation campaign runs in a separate scheduled workflow:
+
+```bash
+MVT_POSTGIS_TEST_HOST=127.0.0.1 python3 scripts/mutation_test.py
+```
+
+It mutates the query builder, feature-ID policy and SRID filtering, runs the
+relevant tests and fails when a mutant survives. Database-backed mutants are
+skipped when `MVT_POSTGIS_TEST_HOST` is not set.
