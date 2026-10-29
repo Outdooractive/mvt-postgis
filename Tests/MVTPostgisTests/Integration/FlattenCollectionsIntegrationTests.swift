@@ -46,7 +46,11 @@ struct FlattenCollectionsIntegrationTests {
                 #expect(homogeneous.count == 2)
                 #expect(homogeneous.allSatisfy { $0.geometry is Point })
                 #expect(homogeneous.allSatisfy { ($0.properties["name"] as? String) == "collection_homogeneous" })
-                #expect(Set(homogeneous.compactMap(\.id)).count == 1)
+                #expect(homogeneous.first?.id == .int(8))
+                let restIds = homogeneous.dropFirst().compactMap(\.id)
+                #expect(restIds.count == homogeneous.count - 1)
+                #expect(Set(restIds).count == restIds.count)
+                #expect(restIds.allSatisfy { $0 != .int(8) })
 
                 let mixed = result.tile.features(for: "collection_mixed")
                 #expect(mixed.count == 2)
