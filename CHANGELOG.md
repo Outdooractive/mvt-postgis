@@ -39,6 +39,8 @@ and this project adheres to semantic versioning.
 - SwiftPM dependency caching in CI to reduce build time across jobs.
 - Tests for SQL generation, source defaults, URL loading, XML errors,
   initialization validation and skipped-layer orchestration.
+- A curated mutation-testing campaign for the query builder, feature-ID policy
+  and SRID filtering, run by a separate scheduled workflow.
 - End-to-end configuration coverage for clipping/simplification/validation
   combinations, buffer sizes, zoom-dependent closures, layer bounds, runtime
   tracking, feature mapping and export buffers.
