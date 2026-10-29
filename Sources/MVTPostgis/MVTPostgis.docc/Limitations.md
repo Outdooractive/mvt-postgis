@@ -179,6 +179,6 @@ the next request retries after the connection cooldown. A pool permanently shut
 down by an authentication, TLS or database-name error is recreated only when a
 TCP probe succeeds, so an outage cannot trigger an unbounded number of pools.
 
-After an administrative termination of every backend, call `shutdown()` before
-issuing more requests; the next request creates a fresh pool. Automatic
-recovery from that state (without an explicit shutdown) is not guaranteed.
+An idle connection whose backend was terminated while the pool was idle is
+detected and replaced on the next lease; an explicit `shutdown()` is not
+required.
