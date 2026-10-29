@@ -36,6 +36,7 @@ and this project adheres to semantic versioning.
   limitations articles.
 - Linux, coverage and DocC CI jobs, plus `scripts/run-coverage.sh` and
   `scripts/check_documentation.py`.
+- SwiftPM dependency caching in CI to reduce build time across jobs.
 - Tests for SQL generation, source defaults, URL loading, XML errors,
   initialization validation and skipped-layer orchestration.
 - End-to-end configuration coverage for clipping/simplification/validation
