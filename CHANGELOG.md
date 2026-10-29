@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to semantic versioning.
 
+## 3.0.0-beta.7 - 2026-10-29
+
+### Changed
+
+- Updated `PostgresConnectionPool` to 1.1.2. Idle connections whose backend was
+  terminated are replaced on the next lease instead of hanging the request, so
+  an explicit pool shutdown is no longer required after an outage.
+
 ## 3.0.0-beta.6 - 2026-10-29
 
 ### Added
@@ -73,10 +81,9 @@ and this project adheres to semantic versioning.
   the minimum supported production version.
 - Documented the PostgreSQL 18 / PostGIS 3.6 support matrix and added a
   workflow-dispatch image override plus a weekly integration schedule.
-- Updated `PostgresConnectionPool` to 1.1.2. A connection that finishes
-  opening while a pool is shutting down is closed and discarded, and idle
-  connections whose backend was terminated are replaced instead of hanging the
-  next request.
+- Updated `PostgresConnectionPool` to 1.1.1. A connection that finishes
+  opening while a pool is shutting down is now closed and discarded instead of
+  leaking and trapping in PostgresNIO on release.
 - Updated to `mvt-tools` 3.0.0-beta.6, `gis-tools` 3.0.0-beta.6,
   `gis-tools-csv` 3.0.0-beta.7 and `postgres-nio` 1.33.2.
 - Rows whose geometry SRID differs from the datasource-declared SRID are
