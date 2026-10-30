@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to semantic versioning.
 
+## 3.0.1 - 2026-10-30
+
+### Fixed
+
+- Removed the unconditional C++ interoperability setting from the `MVTPostgis`
+  and test targets. It was a leftover from the C++ MLT backend, which
+  `mvt-tools` 3.0 replaced with a pure Swift implementation. Targets that
+  import `MVTPostgis` no longer need
+  `swiftSettings: [.interoperabilityMode(.Cxx)]` in their package manifest.
+
 ## 3.0.0 - 2026-10-30
 
 ### Changed

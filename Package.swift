@@ -33,9 +33,6 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "SwiftyXMLParser", package: "SwiftyXMLParser"),
                 .product(name: "Yams", package: "Yams"),
-            ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx),
             ]),
         .testTarget(
             name: "MVTPostgisTests",
@@ -44,8 +41,5 @@ let package = Package(
                 .product(name: "PostgresConnectionPool", package: "PostgresConnectionPool"),
                 .product(name: "PostgresNIO", package: "postgres-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-            ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx),
             ]),
     ])
