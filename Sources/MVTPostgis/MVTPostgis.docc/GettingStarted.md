@@ -6,7 +6,7 @@ Install the package, configure it once, load a source and create a tile.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "2.0.0"),
+    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "3.0.0"),
 ],
 targets: [
     .target(
