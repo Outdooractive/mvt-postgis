@@ -1021,6 +1021,16 @@ struct PostGISIntegrationTests {
                     return false
                 }
 
+                func isSingleLineString(_ geometry: GeoJsonGeometry?) -> Bool {
+                    if geometry is LineString {
+                        return true
+                    }
+                    if let multiLineString = geometry as? MultiLineString {
+                        return multiLineString.lineStrings.count == 1
+                    }
+                    return false
+                }
+
                 for tile in [mvtTile, mltTile] {
                     #expect(tile.features(for: "point").first?.geometry is Point)
                     #expect((tile.features(for: "multipoint").first?.geometry as? MultiPoint)?.coordinates.count == 2)
@@ -1037,7 +1047,7 @@ struct PostGISIntegrationTests {
                     #expect(tile.features(for: "curvepolygon").first?.geometry is Polygon)
                     // Single-part multi-geometries may decode as their singular
                     // type or stay a one-part multi-geometry.
-                    #expect(tile.features(for: "multicurve").first?.geometry is LineString)
+                    #expect(isSingleLineString(tile.features(for: "multicurve").first?.geometry))
                     #expect(isSinglePolygon(tile.features(for: "multisurface").first?.geometry))
                     #expect(isSinglePolygon(tile.features(for: "tin").first?.geometry))
                     #expect(isSinglePolygon(tile.features(for: "polyhedralsurface").first?.geometry))
