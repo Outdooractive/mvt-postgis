@@ -17,7 +17,7 @@ This package requires Swift 6.3 or higher (Xcode 26 or newer), and compiles on m
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "2.0.0"),
+    .package(url: "https://github.com/Outdooractive/mvt-postgis", from: "3.0.0"),
 ],
 targets: [
     .target(name: "MyTarget", dependencies: [

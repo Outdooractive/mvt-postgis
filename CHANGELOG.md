@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to semantic versioning.
 
+## 3.0.0 - 2026-10-30
+
+### Changed
+
+- Updated to `mvt-tools` 3.0.0 and `gis-tools` 3.0.0, using open 3.x ranges.
+- `mvt-tools` MVT support is now behind its `EnableMVT` trait; this package
+  enables `EnableMVT` and `EnableMLT` so both MVT and MLT output keep working.
+  Code that depends on `mvt-tools` directly must enable `EnableMVT` itself.
+
 ## 3.0.0-beta.7 - 2026-10-29
 
 ### Changed
